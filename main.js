@@ -495,12 +495,12 @@ function getCustomSetupSummary(setup) {
 
 function readCustomSetupFromInputs() {
   return {
-    runners: parseIntegerInput(view.customRunnersInput?.value, 1),
-    chasers: parseIntegerInput(view.customChasersInput?.value, 1),
-    humanRole: view.customHumanRoleSelect?.value === ROLE.CHASER ? ROLE.CHASER : ROLE.RUNNER,
-    humanCount: parseIntegerInput(view.customHumanCountInput?.value, 1),
-    cpuCount: parseIntegerInput(view.customCpuCountInput?.value, 0),
-    cpuDifficulty: DIFFICULTY_CONFIG[view.customDifficultySelect?.value]
+    runners: parseIntegerInput(view.customRunnersInput.value, 1),
+    chasers: parseIntegerInput(view.customChasersInput.value, 1),
+    humanRole: view.customHumanRoleSelect.value === ROLE.CHASER ? ROLE.CHASER : ROLE.RUNNER,
+    humanCount: parseIntegerInput(view.customHumanCountInput.value, 1),
+    cpuCount: parseIntegerInput(view.customCpuCountInput.value, 0),
+    cpuDifficulty: DIFFICULTY_CONFIG[view.customDifficultySelect.value]
       ? view.customDifficultySelect.value
       : DIFFICULTY.NORMAL
   };
