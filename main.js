@@ -112,6 +112,11 @@ const ARROW_KEY_ALIASES = {
   arrowright: 'ArrowRight'
 };
 
+const TEAM_COLORS = {
+  [SIDE.BLUE]: ['#3b82f6', '#60a5fa', '#2563eb', '#1d4ed8', '#93c5fd', '#0ea5e9'],
+  [SIDE.RED]: ['#ef4444', '#f87171', '#dc2626', '#b91c1c', '#fb7185', '#f43f5e']
+};
+
 class CpuDecisionEngine {
   constructor(gridSize, difficultyConfig) {
     this.gridSize = gridSize;
@@ -425,9 +430,12 @@ function spawnEntities(entities) {
   }
 }
 
-function parseIntegerInput(value, fallback) {
+function parseIntegerInput(value, fallback, min = Number.NEGATIVE_INFINITY) {
   const parsed = Number.parseInt(String(value), 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, parsed);
 }
 
 function getDefaultCustomSetup() {
@@ -495,11 +503,11 @@ function getCustomSetupSummary(setup) {
 
 function readCustomSetupFromInputs() {
   return {
-    runners: parseIntegerInput(view.customRunnersInput.value, 1),
-    chasers: parseIntegerInput(view.customChasersInput.value, 1),
+    runners: parseIntegerInput(view.customRunnersInput.value, 1, 1),
+    chasers: parseIntegerInput(view.customChasersInput.value, 1, 1),
     humanRole: view.customHumanRoleSelect.value === ROLE.CHASER ? ROLE.CHASER : ROLE.RUNNER,
-    humanCount: parseIntegerInput(view.customHumanCountInput.value, 1),
-    cpuCount: parseIntegerInput(view.customCpuCountInput.value, 0),
+    humanCount: parseIntegerInput(view.customHumanCountInput.value, 1, 1),
+    cpuCount: parseIntegerInput(view.customCpuCountInput.value, 0, 0),
     cpuDifficulty: DIFFICULTY_CONFIG[view.customDifficultySelect.value]
       ? view.customDifficultySelect.value
       : DIFFICULTY.NORMAL
@@ -575,8 +583,8 @@ function createEntitiesForLocalOneVsOne() {
 
 function createEntitiesForLocalTeamMode(teamSize) {
   const redRole = getOppositeRole(state.role);
-  const blueColors = ['#3b82f6', '#60a5fa', '#2563eb'];
-  const redColors = ['#ef4444', '#f87171', '#dc2626'];
+  const blueColors = TEAM_COLORS[SIDE.BLUE];
+  const redColors = TEAM_COLORS[SIDE.RED];
   const entities = [];
 
   for (let i = 0; i < teamSize; i += 1) {
@@ -620,8 +628,8 @@ function createEntitiesForCustomMode() {
   const blueHumanCount = Math.min(setup.humanCount, blueCount);
   const blueCpuCount = Math.max(0, blueCount - blueHumanCount);
   const entities = [];
-  const blueColors = ['#3b82f6', '#60a5fa', '#2563eb', '#1d4ed8', '#93c5fd', '#0ea5e9'];
-  const redColors = ['#ef4444', '#f87171', '#dc2626', '#b91c1c', '#fb7185', '#f43f5e'];
+  const blueColors = TEAM_COLORS[SIDE.BLUE];
+  const redColors = TEAM_COLORS[SIDE.RED];
 
   for (let i = 0; i < blueHumanCount; i += 1) {
     entities.push(
@@ -700,9 +708,6 @@ function getDifficultyLabel() {
       DIFFICULTY_CONFIG[state.customSetup.cpuDifficulty]?.label ??
       DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label
     );
-  }
-  if (state.mode === MODE.CUSTOM && state.customSetup.cpuCount <= 0) {
-    return 'N/A';
   }
   return 'N/A';
 }
