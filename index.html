@@ -10,20 +10,24 @@
   <main class="app-shell">
     <header class="hud" aria-label="Game HUD">
       <div class="hud-item">
-        <span class="label">Your Role</span>
-        <strong id="role-value">Runner</strong>
+        <span class="label">Roles</span>
+        <strong id="role-value">Blue: RUNNER | Red: CHASER</strong>
       </div>
       <div class="hud-item">
         <span class="label">Round Timer</span>
         <strong id="timer-value">60</strong>
       </div>
       <div class="hud-item">
-        <span class="label">Score</span>
+        <span class="label">Score (Runner-Chaser)</span>
         <strong id="score-value">0-0</strong>
       </div>
       <div class="hud-item">
         <span class="label">Countdown</span>
         <strong id="countdown-value">-</strong>
+      </div>
+      <div class="hud-item">
+        <span class="label">Mode</span>
+        <strong id="mode-value">SINGLE PLAYER</strong>
       </div>
       <div class="hud-item">
         <span class="label">Difficulty</span>
@@ -33,6 +37,13 @@
         <button id="start-btn" type="button">Start Game</button>
         <button id="role-runner-btn" type="button">Choose Role: Runner</button>
         <button id="role-chaser-btn" type="button">Choose Role: Chaser</button>
+        <label class="difficulty-picker" for="mode-select">
+          <span class="label">Game Mode</span>
+          <select id="mode-select">
+            <option value="single-player">Single Player</option>
+            <option value="1v1">Local 1v1</option>
+          </select>
+        </label>
         <label class="difficulty-picker" for="difficulty-select">
           <span class="label">CPU Difficulty</span>
           <select id="difficulty-select">
@@ -53,7 +64,7 @@
       <div id="grid" class="grid" role="grid" aria-label="30 by 30 game grid"></div>
     </section>
 
-    <p class="instructions">Move with Arrow Keys or WASD. Blue is you, red is the CPU.</p>
+    <p id="instructions-value" class="instructions">Single Player: Blue (you) moves with WASD or Arrow Keys. Red CPU moves automatically.</p>
   </main>
 
   <script src="main.js"></script>
