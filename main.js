@@ -568,6 +568,14 @@ function countActiveByRole(entities) {
   return { runners, chasers };
 }
 
+function isTeamMode(mode) {
+  return mode === MODE.ONE_VS_ONE || mode === MODE.TWO_VS_TWO || mode === MODE.THREE_VS_THREE;
+}
+
+function removeTaggedRunners(entities, taggedRunnerIds) {
+  return entities.filter((entity) => !(entity.role === ROLE.RUNNER && taggedRunnerIds.has(entity.id)));
+}
+
 function setRoundResult(text) {
   view.resultEl.textContent = text;
 }
@@ -691,13 +699,11 @@ function resolveCollision() {
     return;
   }
 
-  state.entities = state.entities.filter(
-    (entity) => !(entity.role === ROLE.RUNNER && taggedRunnerIds.has(entity.id))
-  );
+  state.entities = removeTaggedRunners(state.entities, taggedRunnerIds);
 
   const activeCounts = countActiveByRole(state.entities);
   if (activeCounts.runners <= 0) {
-    if (state.mode === MODE.ONE_VS_ONE || state.mode === MODE.TWO_VS_TWO || state.mode === MODE.THREE_VS_THREE) {
+    if (isTeamMode(state.mode)) {
       endRound('Chaser team wins: all runners were tagged', ROLE.CHASER);
       return;
     }
@@ -838,7 +844,7 @@ function updatePlaying(deltaMs) {
   }
 
   if (state.remainingMs <= 0) {
-    if (state.mode === MODE.ONE_VS_ONE || state.mode === MODE.TWO_VS_TWO || state.mode === MODE.THREE_VS_THREE) {
+    if (isTeamMode(state.mode)) {
       endRound('Runner team wins: at least one runner survived 60 seconds', ROLE.RUNNER);
     } else if (state.role === ROLE.RUNNER) {
       endRound('You survived', ROLE.RUNNER);
