@@ -58,6 +58,7 @@ body {
   gap: 0.5rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 
 button {
@@ -71,6 +72,21 @@ button {
 button:hover {
   background: #1d4ed8;
   cursor: pointer;
+}
+
+.difficulty-picker {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: flex-start;
+}
+
+select {
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #0f172a;
+  color: var(--text);
+  padding: 0.35rem 0.5rem;
 }
 
 .status-panel {

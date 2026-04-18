@@ -1,8 +1,7 @@
 const CONFIG = {
   GRID_SIZE: 30,
   ROUND_MS: 60000,
-  COUNTDOWN_SECONDS: 3,
-  CPU_STEP_MS: 220
+  COUNTDOWN_SECONDS: 3
 };
 
 const PHASE = {
@@ -16,6 +15,88 @@ const ROLE = {
   RUNNER: 'runner',
   CHASER: 'chaser'
 };
+
+const DIFFICULTY = {
+  NORMAL: 'normal',
+  HARD: 'hard',
+  INSANE: 'insane',
+  DEMON: 'demon'
+};
+
+const DIFFICULTY_CONFIG = {
+  // Difficulty controls both CPU routing quality and per-round speed range.
+  // Higher optimalChance makes choices more consistently optimal.
+  [DIFFICULTY.NORMAL]: { label: 'NORMAL', optimalChance: 0.7, minSpeed: 2, maxSpeed: 4 },
+  [DIFFICULTY.HARD]: { label: 'HARD', optimalChance: 0.8, minSpeed: 4, maxSpeed: 7 },
+  [DIFFICULTY.INSANE]: { label: 'INSANE', optimalChance: 0.95, minSpeed: 7, maxSpeed: 10 },
+  [DIFFICULTY.DEMON]: { label: 'DEMON', optimalChance: 1, minSpeed: 10, maxSpeed: 14 }
+};
+
+class CpuDecisionEngine {
+  constructor(gridSize, difficultyConfig) {
+    this.gridSize = gridSize;
+    this.difficultyConfig = difficultyConfig;
+  }
+
+  static manhattanDistance(a, b) {
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+  }
+
+  getMoveOptions(cpuPosition) {
+    const candidates = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 }
+    ];
+
+    return candidates.filter((delta) => {
+      const nextX = cpuPosition.x + delta.x;
+      const nextY = cpuPosition.y + delta.y;
+      return nextX >= 0 && nextX < this.gridSize && nextY >= 0 && nextY < this.gridSize;
+    });
+  }
+
+  pickRandomMove(moves) {
+    if (moves.length === 0) {
+      return { x: 0, y: 0 };
+    }
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+
+  decideMove({ cpuPosition, humanPosition, cpuRole, difficulty }) {
+    const config = this.difficultyConfig[difficulty] ?? this.difficultyConfig[DIFFICULTY.NORMAL];
+    const options = this.getMoveOptions(cpuPosition).map((delta) => {
+      const next = {
+        x: cpuPosition.x + delta.x,
+        y: cpuPosition.y + delta.y
+      };
+      return {
+        delta,
+        distance: CpuDecisionEngine.manhattanDistance(next, humanPosition)
+      };
+    });
+
+    if (options.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    const isCpuChaser = cpuRole === ROLE.CHASER;
+    const targetDistance = isCpuChaser
+      ? Math.min(...options.map((option) => option.distance))
+      : Math.max(...options.map((option) => option.distance));
+
+    const optimalOptions = options.filter((option) => option.distance === targetDistance);
+    const nonOptimalOptions = options.filter((option) => option.distance !== targetDistance);
+    const chooseOptimal = Math.random() < config.optimalChance;
+    const chosenPool = chooseOptimal || nonOptimalOptions.length === 0 ? optimalOptions : nonOptimalOptions;
+    const choice = this.pickRandomMove(chosenPool.map((option) => option.delta));
+
+    return choice;
+  }
+}
+
+const cpuDecisionEngine = new CpuDecisionEngine(CONFIG.GRID_SIZE, DIFFICULTY_CONFIG);
 
 const inputDelta = {
   ArrowUp: { x: 0, y: -1 },
@@ -31,6 +112,7 @@ const inputDelta = {
 const view = {
   gridEl: document.getElementById('grid'),
   roleEl: document.getElementById('role-value'),
+  difficultyEl: document.getElementById('difficulty-value'),
   timerEl: document.getElementById('timer-value'),
   scoreEl: document.getElementById('score-value'),
   countdownEl: document.getElementById('countdown-value'),
@@ -38,16 +120,19 @@ const view = {
   startBtn: document.getElementById('start-btn'),
   roleRunnerBtn: document.getElementById('role-runner-btn'),
   roleChaserBtn: document.getElementById('role-chaser-btn'),
+  difficultySelect: document.getElementById('difficulty-select'),
   cells: []
 };
 
 const state = {
   phase: PHASE.IDLE,
   role: ROLE.RUNNER,
+  difficulty: DIFFICULTY.NORMAL,
   human: { x: 0, y: 0 },
   cpu: { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 },
   remainingMs: CONFIG.ROUND_MS,
   countdownMs: CONFIG.COUNTDOWN_SECONDS * 1000,
+  cpuStepMs: 500,
   cpuAccumulatorMs: 0,
   score: {
     wins: 0,
@@ -91,6 +176,10 @@ function getRoleLabel() {
   return state.role === ROLE.RUNNER ? 'RUNNER' : 'CHASER';
 }
 
+function getDifficultyLabel() {
+  return DIFFICULTY_CONFIG[state.difficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
+}
+
 function isCollision() {
   return state.human.x === state.cpu.x && state.human.y === state.cpu.y;
 }
@@ -104,9 +193,15 @@ function getCountdownValue() {
 }
 
 function renderHUD() {
+  const isRoundActive = state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN;
   view.roleEl.textContent = getRoleLabel();
+  view.difficultyEl.textContent = getDifficultyLabel();
   view.timerEl.textContent = String(Math.ceil(state.remainingMs / 1000));
   view.scoreEl.textContent = `${state.score.wins}-${state.score.losses}`;
+  view.roleRunnerBtn.disabled = isRoundActive;
+  view.roleChaserBtn.disabled = isRoundActive;
+  view.difficultySelect.disabled = isRoundActive;
+  view.startBtn.disabled = isRoundActive;
 
   if (state.phase === PHASE.COUNTDOWN) {
     view.countdownEl.textContent = String(getCountdownValue());
@@ -161,16 +256,6 @@ function moveHuman(delta) {
   render();
 }
 
-function stepToward(target, current) {
-  if (target > current) return 1;
-  if (target < current) return -1;
-  return 0;
-}
-
-function stepAway(target, current) {
-  return -stepToward(target, current);
-}
-
 function tryMoveCpu(delta) {
   state.cpu = clampToGrid({
     x: state.cpu.x + delta.x,
@@ -178,66 +263,26 @@ function tryMoveCpu(delta) {
   });
 }
 
-function moveCpuAsChaser() {
-  const xStep = stepToward(state.human.x, state.cpu.x);
-  const yStep = stepToward(state.human.y, state.cpu.y);
-
-  const shouldMoveHorizontallyFirst = Math.abs(state.human.x - state.cpu.x) >= Math.abs(state.human.y - state.cpu.y);
-  if (shouldMoveHorizontallyFirst && xStep !== 0) {
-    tryMoveCpu({ x: xStep, y: 0 });
-  } else if (yStep !== 0) {
-    tryMoveCpu({ x: 0, y: yStep });
-  } else if (xStep !== 0) {
-    tryMoveCpu({ x: xStep, y: 0 });
-  }
-}
-
-function pickCpuRunMove() {
-  const xStep = stepAway(state.human.x, state.cpu.x);
-  const yStep = stepAway(state.human.y, state.cpu.y);
-  const options = [];
-
-  if (xStep !== 0) {
-    options.push({ x: xStep, y: 0 });
-  }
-  if (yStep !== 0) {
-    options.push({ x: 0, y: yStep });
-  }
-
-  options.push(
-    { x: 1, y: 0 },
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: -1 }
-  );
-
-  let bestMove = { x: 0, y: 0 };
-  let bestDistance = -1;
-
-  for (const option of options) {
-    const next = clampToGrid({ x: state.cpu.x + option.x, y: state.cpu.y + option.y });
-    const distance = Math.abs(next.x - state.human.x) + Math.abs(next.y - state.human.y);
-    if (distance > bestDistance) {
-      bestDistance = distance;
-      bestMove = { x: next.x - state.cpu.x, y: next.y - state.cpu.y };
-    }
-  }
-
-  return bestMove;
-}
-
-function moveCpuAsRunner() {
-  const move = pickCpuRunMove();
-  tryMoveCpu(move);
-}
-
 function moveCpu() {
-  if (state.role === ROLE.RUNNER) {
-    moveCpuAsChaser();
-  } else {
-    moveCpuAsRunner();
-  }
+  const cpuRole = state.role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
+  const delta = cpuDecisionEngine.decideMove({
+    cpuPosition: state.cpu,
+    humanPosition: state.human,
+    cpuRole,
+    difficulty: state.difficulty
+  });
+  tryMoveCpu(delta);
   resolveCollision();
+}
+
+function randomInRange(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function pickCpuStepMsForRound(difficulty) {
+  const config = DIFFICULTY_CONFIG[difficulty] ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL];
+  const speed = randomInRange(config.minSpeed, config.maxSpeed);
+  return 1000 / speed;
 }
 
 function startRound() {
@@ -245,6 +290,7 @@ function startRound() {
   state.remainingMs = CONFIG.ROUND_MS;
   state.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
   state.cpuAccumulatorMs = 0;
+  state.cpuStepMs = pickCpuStepMsForRound(state.difficulty);
   state.phase = PHASE.COUNTDOWN;
   setRoundResult(`Starting in ${CONFIG.COUNTDOWN_SECONDS}`);
   render();
@@ -263,8 +309,8 @@ function updatePlaying(deltaMs) {
   state.remainingMs = Math.max(0, state.remainingMs - deltaMs);
   state.cpuAccumulatorMs += deltaMs;
 
-  while (state.cpuAccumulatorMs >= CONFIG.CPU_STEP_MS && state.phase === PHASE.PLAYING) {
-    state.cpuAccumulatorMs -= CONFIG.CPU_STEP_MS;
+  while (state.cpuAccumulatorMs >= state.cpuStepMs && state.phase === PHASE.PLAYING) {
+    state.cpuAccumulatorMs -= state.cpuStepMs;
     moveCpu();
   }
 
@@ -323,6 +369,18 @@ function setRole(role) {
   renderEntities();
 }
 
+function setDifficulty(difficulty) {
+  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
+    return;
+  }
+  if (!DIFFICULTY_CONFIG[difficulty]) {
+    return;
+  }
+  state.difficulty = difficulty;
+  setRoundResult('Press Start Game');
+  renderHUD();
+}
+
 function init() {
   buildGrid();
   render();
@@ -332,6 +390,7 @@ function init() {
   view.startBtn.addEventListener('click', startRound);
   view.roleRunnerBtn.addEventListener('click', () => setRole(ROLE.RUNNER));
   view.roleChaserBtn.addEventListener('click', () => setRole(ROLE.CHASER));
+  view.difficultySelect.addEventListener('change', (event) => setDifficulty(event.target.value));
 
   requestAnimationFrame(gameLoop);
 }
