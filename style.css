@@ -5,8 +5,8 @@
   --muted: #94a3b8;
   --cell: #0b1220;
   --cell-border: #334155;
-  --runner: #22c55e;
-  --chaser: #ef4444;
+  --human: #3b82f6;
+  --cpu: #ef4444;
 }
 
 * {
@@ -60,8 +60,7 @@ body {
   justify-content: flex-end;
 }
 
-button,
-select {
+button {
   border: 1px solid #475569;
   border-radius: 6px;
   background: #0f172a;
@@ -74,24 +73,17 @@ button:hover {
   cursor: pointer;
 }
 
-.mode-panel {
+.status-panel {
   background: var(--panel);
   border: 1px solid #334155;
   border-radius: 10px;
   padding: 0.75rem;
-  display: grid;
-  gap: 0.5rem;
+  text-align: center;
 }
 
-.mode-panel h2 {
+.status-panel h2 {
   margin: 0;
   font-size: 1rem;
-}
-
-.mode-note {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 .game-area {
@@ -118,12 +110,12 @@ button:hover {
   border: 1px solid var(--cell-border);
 }
 
-.cell.runner {
-  background: var(--runner);
+.cell.human {
+  background: var(--human);
 }
 
-.cell.chaser {
-  background: var(--chaser);
+.cell.cpu {
+  background: var(--cpu);
 }
 
 .instructions {

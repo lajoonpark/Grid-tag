@@ -1,6 +1,6 @@
 # Grid-tag
 
-A simple browser-based 2D grid chase game scaffold built with plain HTML, CSS, and JavaScript.
+First playable browser-based grid tag game built with plain HTML, CSS, and JavaScript.
 
 ## How to run locally
 
@@ -10,33 +10,25 @@ A simple browser-based 2D grid chase game scaffold built with plain HTML, CSS, a
      - `python -m http.server 8080`
      - Open `http://localhost:8080`
 
-## Implemented features
+## Implemented features (first playable version)
 
-- 30x30 visible square-cell game grid.
-- Top HUD with:
-  - current role
-  - countdown timer
-  - score
-  - game control buttons (start, pause/resume, reset)
-- Placeholder mode selection section wired for future expansion.
-- Keyboard movement for the runner (Arrow keys + WASD).
-- Basic CPU chaser movement and tag detection.
-- Timer-based round and score accumulation.
-- Code in `main.js` organized by:
-  - constants/config
-  - game state
-  - rendering
-  - input
-  - CPU logic
-  - game flow
-
-## Expansion-ready structure
-
-The code is prepared for future support of:
-
-- single player improvements
-- split-screen multiplayer
-- 1v1, 2v2, 3v3 modes
-- custom runner/chaser counts
-
-Core values like grid size, timing, modes, and defaults are centralized in constants to make future scaling easier.
+- 30x30 visible square-cell grid.
+- Single-player round with one human (blue) and one CPU (red).
+- Role selection buttons:
+  - Choose Role: Runner
+  - Choose Role: Chaser
+- Start Game button with visible `3, 2, 1` countdown before movement starts.
+- Human movement:
+  - Arrow keys + WASD
+  - one key press = one tile move
+  - movement clamped to grid bounds
+- Opposite-corner spawning each round.
+- Round timer (60 seconds) and top HUD role display (`RUNNER`/`CHASER`).
+- Collision on same tile counts as tag/catch.
+- Round result text:
+  - `You survived`
+  - `You were caught`
+  - `You caught the CPU`
+  - `Time ran out`
+- Simple score display (`wins-losses`).
+- Game loop driven by `requestAnimationFrame` with modular state/update/render flow.

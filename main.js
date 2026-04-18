@@ -1,108 +1,22 @@
-/* ==========================================
-   Constants and future-ready configuration
-========================================== */
 const CONFIG = {
   GRID_SIZE: 30,
-  CELL_CLASS: 'cell',
-  TIMER_SECONDS: 60,
-  TICK_MS: 1000,
-  CPU_STEP_MS: 280,
-  SCORE_PER_SECOND: 10,
-  MODES: {
-    SINGLE_PLAYER: 'single-player',
-    SPLIT_SCREEN: 'split-screen',
-    TEAM_1V1: '1v1',
-    TEAM_2V2: '2v2',
-    TEAM_3V3: '3v3'
-  },
-  DEFAULT_SETUP: {
-    runnerCount: 1,
-    chaserCount: 1,
-    isSplitScreen: false
-  },
-  COLORS: {
-    runner: '#22c55e',
-    chaser: '#ef4444'
-  }
+  ROUND_MS: 60000,
+  COUNTDOWN_SECONDS: 3,
+  CPU_STEP_MS: 220
 };
 
-/* ==========================================
-   Game state module
-========================================== */
-const state = {
-  mode: CONFIG.MODES.SINGLE_PLAYER,
-  isRunning: false,
-  isPaused: false,
-  role: 'Runner',
-  timeLeft: CONFIG.TIMER_SECONDS,
-  score: 0,
-  setup: { ...CONFIG.DEFAULT_SETUP },
-  entities: {
-    runner: { x: 2, y: 2 },
-    chaser: { x: CONFIG.GRID_SIZE - 3, y: CONFIG.GRID_SIZE - 3 }
-  },
-  timerId: null,
-  cpuId: null
+const PHASE = {
+  IDLE: 'idle',
+  COUNTDOWN: 'countdown',
+  PLAYING: 'playing',
+  ENDED: 'ended'
 };
 
-/* ==========================================
-   Rendering module
-========================================== */
-const view = {
-  gridEl: document.getElementById('grid'),
-  roleEl: document.getElementById('role-value'),
-  timerEl: document.getElementById('timer-value'),
-  scoreEl: document.getElementById('score-value'),
-  startBtn: document.getElementById('start-btn'),
-  pauseBtn: document.getElementById('pause-btn'),
-  resetBtn: document.getElementById('reset-btn'),
-  cells: []
+const ROLE = {
+  RUNNER: 'runner',
+  CHASER: 'chaser'
 };
 
-function buildGrid() {
-  const totalCells = CONFIG.GRID_SIZE * CONFIG.GRID_SIZE;
-  const fragment = document.createDocumentFragment();
-
-  for (let i = 0; i < totalCells; i += 1) {
-    const cell = document.createElement('div');
-    cell.className = CONFIG.CELL_CLASS;
-    fragment.appendChild(cell);
-    view.cells.push(cell);
-  }
-
-  view.gridEl.appendChild(fragment);
-}
-
-function toIndex(x, y) {
-  return y * CONFIG.GRID_SIZE + x;
-}
-
-function renderHUD() {
-  view.roleEl.textContent = state.role;
-  view.timerEl.textContent = String(state.timeLeft);
-  view.scoreEl.textContent = String(state.score);
-}
-
-function renderEntities() {
-  for (const cell of view.cells) {
-    cell.classList.remove('runner', 'chaser');
-  }
-
-  const runner = state.entities.runner;
-  const chaser = state.entities.chaser;
-
-  view.cells[toIndex(runner.x, runner.y)]?.classList.add('runner');
-  view.cells[toIndex(chaser.x, chaser.y)]?.classList.add('chaser');
-}
-
-function render() {
-  renderHUD();
-  renderEntities();
-}
-
-/* ==========================================
-   Input module
-========================================== */
 const inputDelta = {
   ArrowUp: { x: 0, y: -1 },
   ArrowDown: { x: 0, y: 1 },
@@ -114,6 +28,39 @@ const inputDelta = {
   d: { x: 1, y: 0 }
 };
 
+const view = {
+  gridEl: document.getElementById('grid'),
+  roleEl: document.getElementById('role-value'),
+  timerEl: document.getElementById('timer-value'),
+  scoreEl: document.getElementById('score-value'),
+  countdownEl: document.getElementById('countdown-value'),
+  resultEl: document.getElementById('result-value'),
+  startBtn: document.getElementById('start-btn'),
+  roleRunnerBtn: document.getElementById('role-runner-btn'),
+  roleChaserBtn: document.getElementById('role-chaser-btn'),
+  cells: []
+};
+
+const state = {
+  phase: PHASE.IDLE,
+  role: ROLE.RUNNER,
+  human: { x: 0, y: 0 },
+  cpu: { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 },
+  remainingMs: CONFIG.ROUND_MS,
+  countdownMs: CONFIG.COUNTDOWN_SECONDS * 1000,
+  cpuAccumulatorMs: 0,
+  score: {
+    wins: 0,
+    losses: 0
+  }
+};
+
+let lastFrameTime = 0;
+
+function toIndex(x, y) {
+  return y * CONFIG.GRID_SIZE + x;
+}
+
 function clampToGrid(position) {
   return {
     x: Math.max(0, Math.min(CONFIG.GRID_SIZE - 1, position.x)),
@@ -121,17 +68,237 @@ function clampToGrid(position) {
   };
 }
 
-function moveRunner(delta) {
-  state.entities.runner = clampToGrid({
-    x: state.entities.runner.x + delta.x,
-    y: state.entities.runner.y + delta.y
+function buildGrid() {
+  const totalCells = CONFIG.GRID_SIZE * CONFIG.GRID_SIZE;
+  const fragment = document.createDocumentFragment();
+
+  for (let i = 0; i < totalCells; i += 1) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    fragment.appendChild(cell);
+    view.cells.push(cell);
+  }
+
+  view.gridEl.appendChild(fragment);
+}
+
+function resetPositions() {
+  state.human = { x: 0, y: 0 };
+  state.cpu = { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 };
+}
+
+function getRoleLabel() {
+  return state.role === ROLE.RUNNER ? 'RUNNER' : 'CHASER';
+}
+
+function isCollision() {
+  return state.human.x === state.cpu.x && state.human.y === state.cpu.y;
+}
+
+function setRoundResult(text) {
+  view.resultEl.textContent = text;
+}
+
+function renderHUD() {
+  view.roleEl.textContent = getRoleLabel();
+  view.timerEl.textContent = String(Math.ceil(state.remainingMs / 1000));
+  view.scoreEl.textContent = `${state.score.wins}-${state.score.losses}`;
+
+  if (state.phase === PHASE.COUNTDOWN) {
+    const value = Math.max(1, Math.ceil(state.countdownMs / 1000));
+    view.countdownEl.textContent = String(value);
+  } else {
+    view.countdownEl.textContent = '-';
+  }
+}
+
+function renderEntities() {
+  for (const cell of view.cells) {
+    cell.classList.remove('human', 'cpu');
+  }
+
+  view.cells[toIndex(state.human.x, state.human.y)]?.classList.add('human');
+  view.cells[toIndex(state.cpu.x, state.cpu.y)]?.classList.add('cpu');
+}
+
+function render() {
+  renderHUD();
+  renderEntities();
+}
+
+function endRound(resultText, didWin) {
+  state.phase = PHASE.ENDED;
+  if (didWin) {
+    state.score.wins += 1;
+  } else {
+    state.score.losses += 1;
+  }
+  setRoundResult(resultText);
+  renderHUD();
+}
+
+function resolveCollision() {
+  if (!isCollision()) {
+    return;
+  }
+
+  if (state.role === ROLE.CHASER) {
+    endRound('You caught the CPU', true);
+  } else {
+    endRound('You were caught', false);
+  }
+}
+
+function moveHuman(delta) {
+  state.human = clampToGrid({
+    x: state.human.x + delta.x,
+    y: state.human.y + delta.y
   });
-  validateTagCondition();
+  resolveCollision();
   render();
 }
 
+function stepToward(target, current) {
+  if (target > current) return 1;
+  if (target < current) return -1;
+  return 0;
+}
+
+function stepAway(target, current) {
+  return -stepToward(target, current);
+}
+
+function tryMoveCpu(delta) {
+  state.cpu = clampToGrid({
+    x: state.cpu.x + delta.x,
+    y: state.cpu.y + delta.y
+  });
+}
+
+function moveCpuAsChaser() {
+  const xStep = stepToward(state.human.x, state.cpu.x);
+  const yStep = stepToward(state.human.y, state.cpu.y);
+
+  const prioritizeX = Math.abs(state.human.x - state.cpu.x) >= Math.abs(state.human.y - state.cpu.y);
+  if (prioritizeX && xStep !== 0) {
+    tryMoveCpu({ x: xStep, y: 0 });
+  } else if (yStep !== 0) {
+    tryMoveCpu({ x: 0, y: yStep });
+  } else if (xStep !== 0) {
+    tryMoveCpu({ x: xStep, y: 0 });
+  }
+}
+
+function pickCpuRunMove() {
+  const xStep = stepAway(state.human.x, state.cpu.x);
+  const yStep = stepAway(state.human.y, state.cpu.y);
+  const options = [];
+
+  if (xStep !== 0) {
+    options.push({ x: xStep, y: 0 });
+  }
+  if (yStep !== 0) {
+    options.push({ x: 0, y: yStep });
+  }
+
+  options.push(
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 }
+  );
+
+  let bestMove = { x: 0, y: 0 };
+  let bestDistance = -1;
+
+  for (const option of options) {
+    const next = clampToGrid({ x: state.cpu.x + option.x, y: state.cpu.y + option.y });
+    const distance = Math.abs(next.x - state.human.x) + Math.abs(next.y - state.human.y);
+    if (distance > bestDistance) {
+      bestDistance = distance;
+      bestMove = { x: next.x - state.cpu.x, y: next.y - state.cpu.y };
+    }
+  }
+
+  return bestMove;
+}
+
+function moveCpuAsRunner() {
+  const move = pickCpuRunMove();
+  tryMoveCpu(move);
+}
+
+function moveCpu() {
+  if (state.role === ROLE.RUNNER) {
+    moveCpuAsChaser();
+  } else {
+    moveCpuAsRunner();
+  }
+  resolveCollision();
+}
+
+function startRound() {
+  resetPositions();
+  state.remainingMs = CONFIG.ROUND_MS;
+  state.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
+  state.cpuAccumulatorMs = 0;
+  state.phase = PHASE.COUNTDOWN;
+  setRoundResult(`Starting in ${CONFIG.COUNTDOWN_SECONDS}`);
+  render();
+}
+
+function updateCountdown(deltaMs) {
+  state.countdownMs = Math.max(0, state.countdownMs - deltaMs);
+  const countValue = Math.max(1, Math.ceil(state.countdownMs / 1000));
+  setRoundResult(`Starting in ${countValue}`);
+  if (state.countdownMs <= 0) {
+    state.phase = PHASE.PLAYING;
+    setRoundResult('Round in progress');
+  }
+}
+
+function updatePlaying(deltaMs) {
+  state.remainingMs = Math.max(0, state.remainingMs - deltaMs);
+  state.cpuAccumulatorMs += deltaMs;
+
+  while (state.cpuAccumulatorMs >= CONFIG.CPU_STEP_MS && state.phase === PHASE.PLAYING) {
+    state.cpuAccumulatorMs -= CONFIG.CPU_STEP_MS;
+    moveCpu();
+  }
+
+  if (state.phase !== PHASE.PLAYING) {
+    return;
+  }
+
+  if (state.remainingMs <= 0) {
+    if (state.role === ROLE.RUNNER) {
+      endRound('You survived', true);
+    } else {
+      endRound('Time ran out', false);
+    }
+  }
+}
+
+function gameLoop(timestamp) {
+  if (!lastFrameTime) {
+    lastFrameTime = timestamp;
+  }
+
+  const deltaMs = timestamp - lastFrameTime;
+  lastFrameTime = timestamp;
+
+  if (state.phase === PHASE.COUNTDOWN) {
+    updateCountdown(deltaMs);
+  } else if (state.phase === PHASE.PLAYING) {
+    updatePlaying(deltaMs);
+  }
+
+  renderHUD();
+  requestAnimationFrame(gameLoop);
+}
+
 function onKeydown(event) {
-  if (!state.isRunning || state.isPaused) {
+  if (state.phase !== PHASE.PLAYING) {
     return;
   }
 
@@ -141,121 +308,17 @@ function onKeydown(event) {
   }
 
   event.preventDefault();
-  moveRunner(delta);
+  moveHuman(delta);
 }
 
-/* ==========================================
-   CPU module
-========================================== */
-function stepToward(target, current) {
-  if (target > current) return 1;
-  if (target < current) return -1;
-  return 0;
-}
-
-function moveChaserAI() {
-  if (!state.isRunning || state.isPaused) {
+function setRole(role) {
+  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
     return;
   }
-
-  const runner = state.entities.runner;
-  const chaser = state.entities.chaser;
-
-  const xStep = stepToward(runner.x, chaser.x);
-  const yStep = stepToward(runner.y, chaser.y);
-
-  if (Math.random() < 0.5) {
-    state.entities.chaser = clampToGrid({ x: chaser.x + xStep, y: chaser.y });
-  } else {
-    state.entities.chaser = clampToGrid({ x: chaser.x, y: chaser.y + yStep });
-  }
-
-  validateTagCondition();
-  render();
-}
-
-/* ==========================================
-   Game flow module
-========================================== */
-function isTagged() {
-  const { runner, chaser } = state.entities;
-  return runner.x === chaser.x && runner.y === chaser.y;
-}
-
-function stopLoops() {
-  if (state.timerId) {
-    clearInterval(state.timerId);
-    state.timerId = null;
-  }
-  if (state.cpuId) {
-    clearInterval(state.cpuId);
-    state.cpuId = null;
-  }
-}
-
-function endGame(message) {
-  state.isRunning = false;
-  state.isPaused = false;
-  stopLoops();
+  state.role = role;
+  setRoundResult('Press Start Game');
   renderHUD();
-  window.alert(message);
-}
-
-function validateTagCondition() {
-  if (isTagged()) {
-    endGame('Caught! The chaser tagged you.');
-  }
-}
-
-function tickTimer() {
-  if (!state.isRunning || state.isPaused) {
-    return;
-  }
-
-  state.timeLeft -= 1;
-  state.score += CONFIG.SCORE_PER_SECOND;
-
-  if (state.timeLeft <= 0) {
-    state.timeLeft = 0;
-    renderHUD();
-    endGame(`Time up! Final score: ${state.score}`);
-    return;
-  }
-
-  renderHUD();
-}
-
-function resetState() {
-  stopLoops();
-  state.isRunning = false;
-  state.isPaused = false;
-  state.role = 'Runner';
-  state.timeLeft = CONFIG.TIMER_SECONDS;
-  state.score = 0;
-  state.entities.runner = { x: 2, y: 2 };
-  state.entities.chaser = { x: CONFIG.GRID_SIZE - 3, y: CONFIG.GRID_SIZE - 3 };
-  render();
-}
-
-function startGame() {
-  if (state.isRunning) {
-    return;
-  }
-
-  state.isRunning = true;
-  state.isPaused = false;
-  stopLoops();
-
-  state.timerId = window.setInterval(tickTimer, CONFIG.TICK_MS);
-  state.cpuId = window.setInterval(moveChaserAI, CONFIG.CPU_STEP_MS);
-}
-
-function togglePause() {
-  if (!state.isRunning) {
-    return;
-  }
-  state.isPaused = !state.isPaused;
-  view.pauseBtn.textContent = state.isPaused ? 'Resume' : 'Pause';
+  renderEntities();
 }
 
 function init() {
@@ -263,12 +326,12 @@ function init() {
   render();
 
   document.addEventListener('keydown', onKeydown);
-  view.startBtn.addEventListener('click', startGame);
-  view.pauseBtn.addEventListener('click', togglePause);
-  view.resetBtn.addEventListener('click', () => {
-    view.pauseBtn.textContent = 'Pause';
-    resetState();
-  });
+
+  view.startBtn.addEventListener('click', startRound);
+  view.roleRunnerBtn.addEventListener('click', () => setRole(ROLE.RUNNER));
+  view.roleChaserBtn.addEventListener('click', () => setRole(ROLE.CHASER));
+
+  requestAnimationFrame(gameLoop);
 }
 
 init();
