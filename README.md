@@ -39,3 +39,40 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
   - `Time ran out`
 - Simple score display (`wins-losses`).
 - Game loop driven by `requestAnimationFrame` with modular state/update/render flow.
+
+## Entity architecture (refactor for multi-unit modes)
+
+The game now uses an entity-based model instead of fixed `human`/`cpu` position variables.
+
+Each entity stores:
+
+- `id`
+- `side` (team/side)
+- `role` (`runner` or `chaser`)
+- `color`
+- `x`, `y` position
+- `isHuman` / `isCPU`
+- `controlMapping` (when human-controlled)
+- `cpuSettings` (when CPU-controlled)
+
+Core systems in `main.js` are organized around that entity shape:
+
+- **Entity creation**: `createEntity`, `createHumanEntity`, `createCpuEntity`
+- **Spawning**: `spawnEntities`, `getSpawnQueueForSide`
+- **Movement**: `moveEntity`, `moveHumanByKey`, `updateCpuMovement`, `moveCpuEntity`
+- **Collision / tag resolution**: `findTagEvents`, `resolveCollision`
+- **Rendering**: `renderEntities`
+
+`state.entities` is now the single source of truth for all player/CPU units.
+
+## Future mode readiness
+
+The architecture is prepared for future modes by keeping mode definitions and entity systems mode-agnostic:
+
+- split-screen multiplayer
+- 1v1
+- 2v2
+- 3v3
+- custom mode with arbitrary counts
+
+Current gameplay remains the same single-player experience (one human vs one CPU), while the internal systems now support scaling to multiple runners and chasers.
