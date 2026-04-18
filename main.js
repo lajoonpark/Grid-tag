@@ -98,6 +98,13 @@ const CONTROL_MAPPINGS = {
   }
 };
 
+const ARROW_KEY_ALIASES = {
+  arrowup: 'ArrowUp',
+  arrowdown: 'ArrowDown',
+  arrowleft: 'ArrowLeft',
+  arrowright: 'ArrowRight'
+};
+
 class CpuDecisionEngine {
   constructor(gridSize, difficultyConfig) {
     this.gridSize = gridSize;
@@ -318,20 +325,20 @@ function spawnEntities(entities) {
     }
 
     const queue = sideQueues.get(entity.side);
-    let queueIndex = sideQueueIndexes.get(entity.side) ?? 0;
+    let queueIndex = sideQueueIndexes.get(entity.side);
 
     while (queueIndex < queue.length) {
       const spawnPoint = queue[queueIndex];
-      const key = toIndex(spawnPoint.x, spawnPoint.y);
+      const positionKey = toIndex(spawnPoint.x, spawnPoint.y);
       queueIndex += 1;
 
-      if (occupied.has(key)) {
+      if (occupied.has(positionKey)) {
         continue;
       }
 
       entity.x = spawnPoint.x;
       entity.y = spawnPoint.y;
-      occupied.add(key);
+      occupied.add(positionKey);
       break;
     }
 
@@ -340,15 +347,13 @@ function spawnEntities(entities) {
 }
 
 function createEntitiesForCurrentMode() {
-  const modeConfig = MODE_PRESETS[state.mode] ?? MODE_PRESETS[MODE.SINGLE_PLAYER];
-
   if (state.mode !== MODE.SINGLE_PLAYER) {
-    // Future modes are modeled with the same entity shape; only counts and control maps differ.
-    // For now we keep gameplay in the existing single-player behavior.
-    return createEntitiesForSinglePlayer();
+    // TODO: Build entities from MODE_PRESETS[state.mode].sides and assign controls/CPU settings per entity.
+    // TODO: Use per-mode team composition (1v1/2v2/3v3/custom/split-screen) instead of single-player defaults.
+    console.warn(`Mode "${state.mode}" is not implemented yet. Falling back to single-player.`);
   }
 
-  return createEntitiesForSinglePlayer(modeConfig);
+  return createEntitiesForSinglePlayer();
 }
 
 function createEntitiesForSinglePlayer() {
@@ -449,11 +454,11 @@ function findTagEvents(entities) {
   const tiles = new Map();
 
   for (const entity of entities) {
-    const key = `${entity.x},${entity.y}`;
-    if (!tiles.has(key)) {
-      tiles.set(key, []);
+    const tileKey = String(toIndex(entity.x, entity.y));
+    if (!tiles.has(tileKey)) {
+      tiles.set(tileKey, []);
     }
-    tiles.get(key).push(entity);
+    tiles.get(tileKey).push(entity);
   }
 
   const events = [];
@@ -588,7 +593,11 @@ function updateCpuMovement(deltaMs) {
 
     entity.cpuSettings.accumulatorMs += deltaMs;
 
-    while (entity.cpuSettings.accumulatorMs >= entity.cpuSettings.stepMs && state.phase === PHASE.PLAYING) {
+    while (entity.cpuSettings.accumulatorMs >= entity.cpuSettings.stepMs) {
+      if (state.phase !== PHASE.PLAYING) {
+        return;
+      }
+
       entity.cpuSettings.accumulatorMs -= entity.cpuSettings.stepMs;
       moveCpuEntity(entity);
       resolveCollision();
@@ -657,12 +666,20 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
+function normalizeKey(eventKey) {
+  const lowerKey = eventKey.toLowerCase();
+  if (ARROW_KEY_ALIASES[lowerKey]) {
+    return ARROW_KEY_ALIASES[lowerKey];
+  }
+  return lowerKey;
+}
+
 function onKeydown(event) {
   if (state.phase !== PHASE.PLAYING) {
     return;
   }
 
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  const key = normalizeKey(event.key);
   const hasHumanControl = state.entities.some(
     (entity) => entity.isHuman && entity.controlMapping && entity.controlMapping[key]
   );
@@ -700,10 +717,7 @@ function setDifficulty(difficulty) {
 function init() {
   buildGrid();
 
-  // Entity organization:
-  // - `state.entities` is the single source of truth for every player/CPU unit.
-  // - Each entity carries identity, side, role, color, position, and control/CPU metadata.
-  // - Systems below (create/spawn/move/collision/render) are mode-agnostic and support future team sizes.
+  // See README "Entity architecture" for the full organization and system breakdown.
   state.entities = createEntitiesForCurrentMode();
   spawnEntities(state.entities);
   render();
