@@ -17,8 +17,8 @@ const ROLE = {
 };
 
 const SIDE = {
-  PLAYER: 'player',
-  CPU: 'cpu'
+  BLUE: 'blue',
+  RED: 'red'
 };
 
 const DIFFICULTY = {
@@ -50,8 +50,8 @@ const MODE_PRESETS = {
   [MODE.SINGLE_PLAYER]: {
     description: 'Current mode: one human vs one CPU',
     sides: {
-      [SIDE.PLAYER]: 1,
-      [SIDE.CPU]: 1
+      [SIDE.BLUE]: 1,
+      [SIDE.RED]: 1
     }
   },
   [MODE.SPLIT_SCREEN]: {
@@ -61,22 +61,22 @@ const MODE_PRESETS = {
   [MODE.ONE_VS_ONE]: {
     description: 'Reserved for one entity per side',
     sides: {
-      [SIDE.PLAYER]: 1,
-      [SIDE.CPU]: 1
+      [SIDE.BLUE]: 1,
+      [SIDE.RED]: 1
     }
   },
   [MODE.TWO_VS_TWO]: {
     description: 'Reserved for two entities per side',
     sides: {
-      [SIDE.PLAYER]: 2,
-      [SIDE.CPU]: 2
+      [SIDE.BLUE]: 2,
+      [SIDE.RED]: 2
     }
   },
   [MODE.THREE_VS_THREE]: {
     description: 'Reserved for three entities per side',
     sides: {
-      [SIDE.PLAYER]: 3,
-      [SIDE.CPU]: 3
+      [SIDE.BLUE]: 3,
+      [SIDE.RED]: 3
     }
   },
   [MODE.CUSTOM]: {
@@ -97,21 +97,12 @@ const CONTROL_MAPPINGS = {
     ArrowDown: { x: 0, y: 1 },
     ArrowLeft: { x: -1, y: 0 },
     ArrowRight: { x: 1, y: 0 }
-  },
-  ARROW_WASD: {
-    ...{
-      ArrowUp: { x: 0, y: -1 },
-      ArrowDown: { x: 0, y: 1 },
-      ArrowLeft: { x: -1, y: 0 },
-      ArrowRight: { x: 1, y: 0 }
-    },
-    ...{
-      w: { x: 0, y: -1 },
-      s: { x: 0, y: 1 },
-      a: { x: -1, y: 0 },
-      d: { x: 1, y: 0 }
-    }
   }
+};
+
+CONTROL_MAPPINGS.ARROW_WASD = {
+  ...CONTROL_MAPPINGS.ARROWS,
+  ...CONTROL_MAPPINGS.WASD
 };
 
 const ARROW_KEY_ALIASES = {
@@ -315,7 +306,7 @@ function createCpuEntity({ id, side, role, color, difficulty }) {
 function getSpawnQueueForSide(side) {
   const points = [];
 
-  if (side === SIDE.PLAYER) {
+  if (side === SIDE.BLUE) {
     for (let y = 0; y < CONFIG.GRID_SIZE; y += 1) {
       for (let x = 0; x < CONFIG.GRID_SIZE; x += 1) {
         points.push({ x, y });
@@ -379,19 +370,19 @@ function createEntitiesForCurrentMode() {
 }
 
 function createEntitiesForSinglePlayer() {
-  const cpuRole = state.role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
+  const cpuRole = getOppositeRole(state.role);
 
   return [
     createHumanEntity({
       id: 'human-1',
-      side: SIDE.PLAYER,
+      side: SIDE.BLUE,
       role: state.role,
       color: '#3b82f6',
       controlMapping: CONTROL_MAPPINGS.ARROW_WASD
     }),
     createCpuEntity({
       id: 'cpu-1',
-      side: SIDE.CPU,
+      side: SIDE.RED,
       role: cpuRole,
       color: '#ef4444',
       difficulty: state.difficulty
@@ -400,19 +391,19 @@ function createEntitiesForSinglePlayer() {
 }
 
 function createEntitiesForLocalOneVsOne() {
-  const redRole = state.role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
+  const redRole = getOppositeRole(state.role);
 
   return [
     createHumanEntity({
       id: 'blue-player',
-      side: SIDE.PLAYER,
+      side: SIDE.BLUE,
       role: state.role,
       color: '#3b82f6',
       controlMapping: CONTROL_MAPPINGS.WASD
     }),
     createHumanEntity({
       id: 'red-player',
-      side: SIDE.CPU,
+      side: SIDE.RED,
       role: redRole,
       color: '#ef4444',
       controlMapping: CONTROL_MAPPINGS.ARROWS

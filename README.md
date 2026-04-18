@@ -49,7 +49,7 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
   - `Runner side wins: survived 60 seconds`
   - `Chaser side wins: runner was tagged`
   - `Time ran out`
-- Simple score display (`wins-losses`).
+- Simple score display (`runner wins - chaser wins`).
 - Game loop driven by `requestAnimationFrame` with modular state/update/render flow.
 
 ## Entity architecture (refactor for multi-unit modes)
