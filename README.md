@@ -37,5 +37,11 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
   - `You were caught`
   - `You caught the CPU`
   - `Time ran out`
-- Simple score display (`wins-losses`).
+- Match score display (`player : cpu`) with localStorage persistence.
+- Score-based round win rules:
+  - Runner survives → player point
+  - Player catches CPU as chaser → player point
+  - CPU catches player runner → CPU point
+  - Player fails to catch CPU in time → CPU point
+- Reset Score button (score only) and New Round button (restart round with current settings).
 - Game loop driven by `requestAnimationFrame` with modular state/update/render flow.

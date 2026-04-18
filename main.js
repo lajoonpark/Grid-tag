@@ -4,6 +4,11 @@ const CONFIG = {
   COUNTDOWN_SECONDS: 3
 };
 
+const STORAGE_KEYS = {
+  SCORE: 'grid-tag.score',
+  SETTINGS: 'grid-tag.settings'
+};
+
 const PHASE = {
   IDLE: 'idle',
   COUNTDOWN: 'countdown',
@@ -14,6 +19,11 @@ const PHASE = {
 const ROLE = {
   RUNNER: 'runner',
   CHASER: 'chaser'
+};
+
+const ROUND_WINNER = {
+  PLAYER: 'player',
+  CPU: 'cpu'
 };
 
 const DIFFICULTY = {
@@ -118,29 +128,84 @@ const view = {
   countdownEl: document.getElementById('countdown-value'),
   resultEl: document.getElementById('result-value'),
   startBtn: document.getElementById('start-btn'),
+  newRoundBtn: document.getElementById('new-round-btn'),
+  resetScoreBtn: document.getElementById('reset-score-btn'),
   roleRunnerBtn: document.getElementById('role-runner-btn'),
   roleChaserBtn: document.getElementById('role-chaser-btn'),
   difficultySelect: document.getElementById('difficulty-select'),
   cells: []
 };
 
+function readJsonStorage(key) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage failures (private mode / quota).
+  }
+}
+
+function getInitialSettings() {
+  const stored = readJsonStorage(STORAGE_KEYS.SETTINGS);
+  const role = stored?.role;
+  const difficulty = stored?.difficulty;
+
+  return {
+    role: role === ROLE.CHASER ? ROLE.CHASER : ROLE.RUNNER,
+    difficulty: DIFFICULTY_CONFIG[difficulty] ? difficulty : DIFFICULTY.NORMAL
+  };
+}
+
+function getInitialScore() {
+  const stored = readJsonStorage(STORAGE_KEYS.SCORE);
+  const player = Number(stored?.player);
+  const cpu = Number(stored?.cpu);
+
+  return {
+    player: Number.isFinite(player) && player >= 0 ? player : 0,
+    cpu: Number.isFinite(cpu) && cpu >= 0 ? cpu : 0
+  };
+}
+
+const initialSettings = getInitialSettings();
+
 const state = {
-  phase: PHASE.IDLE,
-  role: ROLE.RUNNER,
-  difficulty: DIFFICULTY.NORMAL,
-  human: { x: 0, y: 0 },
-  cpu: { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 },
-  remainingMs: CONFIG.ROUND_MS,
-  countdownMs: CONFIG.COUNTDOWN_SECONDS * 1000,
-  cpuStepMs: 500,
-  cpuAccumulatorMs: 0,
-  score: {
-    wins: 0,
-    losses: 0
+  settings: {
+    role: initialSettings.role,
+    difficulty: initialSettings.difficulty
+  },
+  matchScore: getInitialScore(),
+  round: {
+    phase: PHASE.IDLE,
+    human: { x: 0, y: 0 },
+    cpu: { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 },
+    remainingMs: CONFIG.ROUND_MS,
+    countdownMs: CONFIG.COUNTDOWN_SECONDS * 1000,
+    cpuStepMs: 500,
+    cpuAccumulatorMs: 0
   }
 };
 
 let lastFrameTime = 0;
+
+function saveSettings() {
+  writeJsonStorage(STORAGE_KEYS.SETTINGS, {
+    role: state.settings.role,
+    difficulty: state.settings.difficulty
+  });
+}
+
+function saveScore() {
+  writeJsonStorage(STORAGE_KEYS.SCORE, state.matchScore);
+}
 
 function toIndex(x, y) {
   return y * CONFIG.GRID_SIZE + x;
@@ -168,20 +233,20 @@ function buildGrid() {
 }
 
 function resetPositions() {
-  state.human = { x: 0, y: 0 };
-  state.cpu = { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 };
+  state.round.human = { x: 0, y: 0 };
+  state.round.cpu = { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 };
 }
 
 function getRoleLabel() {
-  return state.role === ROLE.RUNNER ? 'RUNNER' : 'CHASER';
+  return state.settings.role === ROLE.RUNNER ? 'RUNNER' : 'CHASER';
 }
 
 function getDifficultyLabel() {
-  return DIFFICULTY_CONFIG[state.difficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
+  return DIFFICULTY_CONFIG[state.settings.difficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
 }
 
 function isCollision() {
-  return state.human.x === state.cpu.x && state.human.y === state.cpu.y;
+  return state.round.human.x === state.round.cpu.x && state.round.human.y === state.round.cpu.y;
 }
 
 function setRoundResult(text) {
@@ -189,21 +254,24 @@ function setRoundResult(text) {
 }
 
 function getCountdownValue() {
-  return Math.max(1, Math.ceil(state.countdownMs / 1000));
+  return Math.max(1, Math.ceil(state.round.countdownMs / 1000));
+}
+
+function isRoundActive() {
+  return state.round.phase === PHASE.PLAYING || state.round.phase === PHASE.COUNTDOWN;
 }
 
 function renderHUD() {
-  const isRoundActive = state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN;
   view.roleEl.textContent = getRoleLabel();
   view.difficultyEl.textContent = getDifficultyLabel();
-  view.timerEl.textContent = String(Math.ceil(state.remainingMs / 1000));
-  view.scoreEl.textContent = `${state.score.wins}-${state.score.losses}`;
-  view.roleRunnerBtn.disabled = isRoundActive;
-  view.roleChaserBtn.disabled = isRoundActive;
-  view.difficultySelect.disabled = isRoundActive;
-  view.startBtn.disabled = isRoundActive;
+  view.timerEl.textContent = String(Math.ceil(state.round.remainingMs / 1000));
+  view.scoreEl.textContent = `${state.matchScore.player} : ${state.matchScore.cpu}`;
+  view.roleRunnerBtn.disabled = isRoundActive();
+  view.roleChaserBtn.disabled = isRoundActive();
+  view.difficultySelect.disabled = isRoundActive();
+  view.startBtn.disabled = isRoundActive();
 
-  if (state.phase === PHASE.COUNTDOWN) {
+  if (state.round.phase === PHASE.COUNTDOWN) {
     view.countdownEl.textContent = String(getCountdownValue());
   } else {
     view.countdownEl.textContent = '-';
@@ -215,8 +283,8 @@ function renderEntities() {
     cell.classList.remove('human', 'cpu');
   }
 
-  view.cells[toIndex(state.human.x, state.human.y)]?.classList.add('human');
-  view.cells[toIndex(state.cpu.x, state.cpu.y)]?.classList.add('cpu');
+  view.cells[toIndex(state.round.human.x, state.round.human.y)]?.classList.add('human');
+  view.cells[toIndex(state.round.cpu.x, state.round.cpu.y)]?.classList.add('cpu');
 }
 
 function render() {
@@ -224,13 +292,21 @@ function render() {
   renderEntities();
 }
 
-function endRound(resultText, didWin) {
-  state.phase = PHASE.ENDED;
-  if (didWin) {
-    state.score.wins += 1;
-  } else {
-    state.score.losses += 1;
+function awardRoundWin(winner) {
+  if (winner === ROUND_WINNER.PLAYER) {
+    state.matchScore.player += 1;
+    saveScore();
+    return;
   }
+  if (winner === ROUND_WINNER.CPU) {
+    state.matchScore.cpu += 1;
+    saveScore();
+  }
+}
+
+function endRound(resultText, winner) {
+  state.round.phase = PHASE.ENDED;
+  awardRoundWin(winner);
   setRoundResult(resultText);
   renderHUD();
 }
@@ -240,36 +316,36 @@ function resolveCollision() {
     return;
   }
 
-  if (state.role === ROLE.CHASER) {
-    endRound('You caught the CPU', true);
+  if (state.settings.role === ROLE.CHASER) {
+    endRound('You caught the CPU', ROUND_WINNER.PLAYER);
   } else {
-    endRound('You were caught', false);
+    endRound('You were caught', ROUND_WINNER.CPU);
   }
 }
 
 function moveHuman(delta) {
-  state.human = clampToGrid({
-    x: state.human.x + delta.x,
-    y: state.human.y + delta.y
+  state.round.human = clampToGrid({
+    x: state.round.human.x + delta.x,
+    y: state.round.human.y + delta.y
   });
   resolveCollision();
   render();
 }
 
 function tryMoveCpu(delta) {
-  state.cpu = clampToGrid({
-    x: state.cpu.x + delta.x,
-    y: state.cpu.y + delta.y
+  state.round.cpu = clampToGrid({
+    x: state.round.cpu.x + delta.x,
+    y: state.round.cpu.y + delta.y
   });
 }
 
 function moveCpu() {
-  const cpuRole = state.role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
+  const cpuRole = state.settings.role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
   const delta = cpuDecisionEngine.decideMove({
-    cpuPosition: state.cpu,
-    humanPosition: state.human,
+    cpuPosition: state.round.cpu,
+    humanPosition: state.round.human,
     cpuRole,
-    difficulty: state.difficulty
+    difficulty: state.settings.difficulty
   });
   tryMoveCpu(delta);
   resolveCollision();
@@ -287,42 +363,49 @@ function pickCpuStepMsForRound(difficulty) {
 
 function startRound() {
   resetPositions();
-  state.remainingMs = CONFIG.ROUND_MS;
-  state.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
-  state.cpuAccumulatorMs = 0;
-  state.cpuStepMs = pickCpuStepMsForRound(state.difficulty);
-  state.phase = PHASE.COUNTDOWN;
+  state.round.remainingMs = CONFIG.ROUND_MS;
+  state.round.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
+  state.round.cpuAccumulatorMs = 0;
+  state.round.cpuStepMs = pickCpuStepMsForRound(state.settings.difficulty);
+  state.round.phase = PHASE.COUNTDOWN;
   setRoundResult(`Starting in ${CONFIG.COUNTDOWN_SECONDS}`);
   render();
 }
 
+function resetScoreOnly() {
+  state.matchScore.player = 0;
+  state.matchScore.cpu = 0;
+  saveScore();
+  renderHUD();
+}
+
 function updateCountdown(deltaMs) {
-  state.countdownMs = Math.max(0, state.countdownMs - deltaMs);
+  state.round.countdownMs = Math.max(0, state.round.countdownMs - deltaMs);
   setRoundResult(`Starting in ${getCountdownValue()}`);
-  if (state.countdownMs <= 0) {
-    state.phase = PHASE.PLAYING;
+  if (state.round.countdownMs <= 0) {
+    state.round.phase = PHASE.PLAYING;
     setRoundResult('Round in progress');
   }
 }
 
 function updatePlaying(deltaMs) {
-  state.remainingMs = Math.max(0, state.remainingMs - deltaMs);
-  state.cpuAccumulatorMs += deltaMs;
+  state.round.remainingMs = Math.max(0, state.round.remainingMs - deltaMs);
+  state.round.cpuAccumulatorMs += deltaMs;
 
-  while (state.cpuAccumulatorMs >= state.cpuStepMs && state.phase === PHASE.PLAYING) {
-    state.cpuAccumulatorMs -= state.cpuStepMs;
+  while (state.round.cpuAccumulatorMs >= state.round.cpuStepMs && state.round.phase === PHASE.PLAYING) {
+    state.round.cpuAccumulatorMs -= state.round.cpuStepMs;
     moveCpu();
   }
 
-  if (state.phase !== PHASE.PLAYING) {
+  if (state.round.phase !== PHASE.PLAYING) {
     return;
   }
 
-  if (state.remainingMs <= 0) {
-    if (state.role === ROLE.RUNNER) {
-      endRound('You survived', true);
+  if (state.round.remainingMs <= 0) {
+    if (state.settings.role === ROLE.RUNNER) {
+      endRound('You survived', ROUND_WINNER.PLAYER);
     } else {
-      endRound('Time ran out', false);
+      endRound('Time ran out', ROUND_WINNER.CPU);
     }
   }
 }
@@ -335,9 +418,9 @@ function gameLoop(timestamp) {
   const deltaMs = timestamp - lastFrameTime;
   lastFrameTime = timestamp;
 
-  if (state.phase === PHASE.COUNTDOWN) {
+  if (state.round.phase === PHASE.COUNTDOWN) {
     updateCountdown(deltaMs);
-  } else if (state.phase === PHASE.PLAYING) {
+  } else if (state.round.phase === PHASE.PLAYING) {
     updatePlaying(deltaMs);
   }
 
@@ -346,7 +429,7 @@ function gameLoop(timestamp) {
 }
 
 function onKeydown(event) {
-  if (state.phase !== PHASE.PLAYING) {
+  if (state.round.phase !== PHASE.PLAYING) {
     return;
   }
 
@@ -360,34 +443,39 @@ function onKeydown(event) {
 }
 
 function setRole(role) {
-  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
+  if (isRoundActive()) {
     return;
   }
-  state.role = role;
+  state.settings.role = role;
+  saveSettings();
   setRoundResult('Press Start Game');
   renderHUD();
   renderEntities();
 }
 
 function setDifficulty(difficulty) {
-  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
+  if (isRoundActive()) {
     return;
   }
   if (!DIFFICULTY_CONFIG[difficulty]) {
     return;
   }
-  state.difficulty = difficulty;
+  state.settings.difficulty = difficulty;
+  saveSettings();
   setRoundResult('Press Start Game');
   renderHUD();
 }
 
 function init() {
   buildGrid();
+  view.difficultySelect.value = state.settings.difficulty;
   render();
 
   document.addEventListener('keydown', onKeydown);
 
   view.startBtn.addEventListener('click', startRound);
+  view.newRoundBtn.addEventListener('click', startRound);
+  view.resetScoreBtn.addEventListener('click', resetScoreOnly);
   view.roleRunnerBtn.addEventListener('click', () => setRole(ROLE.RUNNER));
   view.roleChaserBtn.addEventListener('click', () => setRole(ROLE.CHASER));
   view.difficultySelect.addEventListener('change', (event) => setDifficulty(event.target.value));
