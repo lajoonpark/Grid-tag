@@ -704,7 +704,7 @@ function resolveCollision() {
   const activeCounts = countActiveByRole(state.entities);
   if (activeCounts.runners <= 0) {
     if (isLocalVersusMode(state.mode)) {
-      endRound('Chaser team wins: all runners were tagged', ROLE.CHASER);
+      endRound('Chaser side wins: all runners were tagged', ROLE.CHASER);
       return;
     }
 
@@ -845,7 +845,7 @@ function updatePlaying(deltaMs) {
 
   if (state.remainingMs <= 0) {
     if (isLocalVersusMode(state.mode)) {
-      endRound('Runner team wins: at least one runner survived 60 seconds', ROLE.RUNNER);
+      endRound('Runner side wins: at least one runner survived 60 seconds', ROLE.RUNNER);
     } else if (state.role === ROLE.RUNNER) {
       endRound('You survived', ROLE.RUNNER);
     } else {
