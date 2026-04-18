@@ -48,6 +48,7 @@
             <option value="1v1">Local 1v1</option>
             <option value="2v2">Local 2v2</option>
             <option value="3v3">Local 3v3</option>
+            <option value="custom">Custom</option>
           </select>
         </label>
         <label class="difficulty-picker" for="difficulty-select">
@@ -60,6 +61,43 @@
           </select>
         </label>
       </div>
+
+      <section id="custom-setup-panel" class="custom-setup-panel" aria-label="Custom mode setup" hidden>
+        <label class="difficulty-picker" for="custom-runners-input">
+          <span class="label">Runners</span>
+          <input id="custom-runners-input" type="number" min="1" value="2" />
+        </label>
+        <label class="difficulty-picker" for="custom-chasers-input">
+          <span class="label">Chasers</span>
+          <input id="custom-chasers-input" type="number" min="1" value="2" />
+        </label>
+        <label class="difficulty-picker" for="custom-human-role-select">
+          <span class="label">Human Role</span>
+          <select id="custom-human-role-select">
+            <option value="runner">Runner</option>
+            <option value="chaser">Chaser</option>
+          </select>
+        </label>
+        <label class="difficulty-picker" for="custom-human-count-input">
+          <span class="label">Human-Controlled</span>
+          <input id="custom-human-count-input" type="number" min="1" value="1" />
+        </label>
+        <label class="difficulty-picker" for="custom-cpu-count-input">
+          <span class="label">CPU-Controlled</span>
+          <input id="custom-cpu-count-input" type="number" min="0" value="3" />
+        </label>
+        <label class="difficulty-picker" for="custom-difficulty-select">
+          <span class="label">CPU Difficulty</span>
+          <select id="custom-difficulty-select">
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="insane">Insane</option>
+            <option value="demon">Demon</option>
+          </select>
+        </label>
+        <p id="custom-validation-message" class="custom-validation-message" role="status"></p>
+        <p id="custom-summary-value" class="custom-summary-value"></p>
+      </section>
     </header>
 
     <section class="status-panel" aria-label="Round status">

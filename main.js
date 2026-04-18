@@ -194,6 +194,15 @@ const view = {
   roleChaserBtn: document.getElementById('role-chaser-btn'),
   modeSelect: document.getElementById('mode-select'),
   difficultySelect: document.getElementById('difficulty-select'),
+  customSetupPanel: document.getElementById('custom-setup-panel'),
+  customRunnersInput: document.getElementById('custom-runners-input'),
+  customChasersInput: document.getElementById('custom-chasers-input'),
+  customHumanRoleSelect: document.getElementById('custom-human-role-select'),
+  customHumanCountInput: document.getElementById('custom-human-count-input'),
+  customCpuCountInput: document.getElementById('custom-cpu-count-input'),
+  customDifficultySelect: document.getElementById('custom-difficulty-select'),
+  customValidationMessage: document.getElementById('custom-validation-message'),
+  customSummaryEl: document.getElementById('custom-summary-value'),
   cells: []
 };
 
@@ -205,6 +214,7 @@ const state = {
   entities: [],
   remainingMs: CONFIG.ROUND_MS,
   countdownMs: CONFIG.COUNTDOWN_SECONDS * 1000,
+  customSetup: getDefaultCustomSetup(),
   score: {
     runnerWins: 0,
     chaserWins: 0
@@ -415,6 +425,87 @@ function spawnEntities(entities) {
   }
 }
 
+function parseIntegerInput(value, fallback) {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getDefaultCustomSetup() {
+  return {
+    runners: 2,
+    chasers: 2,
+    humanRole: ROLE.RUNNER,
+    humanCount: 1,
+    cpuCount: 3,
+    cpuDifficulty: DIFFICULTY.NORMAL
+  };
+}
+
+function getCustomRoleCount(setup, role) {
+  return role === ROLE.RUNNER ? setup.runners : setup.chasers;
+}
+
+function getCustomSetupValidation(setup) {
+  const total = setup.runners + setup.chasers;
+  const selectedRoleCount = getCustomRoleCount(setup, setup.humanRole);
+
+  if (!Number.isInteger(setup.runners) || setup.runners < 1) {
+    return { isValid: false, message: 'Runners must be at least 1.' };
+  }
+  if (!Number.isInteger(setup.chasers) || setup.chasers < 1) {
+    return { isValid: false, message: 'Chasers must be at least 1.' };
+  }
+  if (!Number.isInteger(setup.humanCount) || setup.humanCount < 1) {
+    return { isValid: false, message: 'Human-controlled count must be at least 1.' };
+  }
+  if (!Number.isInteger(setup.cpuCount) || setup.cpuCount < 0) {
+    return { isValid: false, message: 'CPU-controlled count cannot be negative.' };
+  }
+  if (!DIFFICULTY_CONFIG[setup.cpuDifficulty]) {
+    return { isValid: false, message: 'Select a valid CPU difficulty.' };
+  }
+  if (total > CONFIG.GRID_SIZE * CONFIG.GRID_SIZE) {
+    return { isValid: false, message: 'Total runners + chasers exceeds available grid cells.' };
+  }
+  if (setup.humanCount > selectedRoleCount) {
+    const roleLabel = setup.humanRole === ROLE.RUNNER ? 'runner' : 'chaser';
+    return {
+      isValid: false,
+      message: `Human-controlled count cannot exceed total ${roleLabel}s (${selectedRoleCount}).`
+    };
+  }
+  if (setup.humanCount + setup.cpuCount !== total) {
+    return {
+      isValid: false,
+      message: `Human + CPU must equal runners + chasers (${total}).`
+    };
+  }
+
+  return { isValid: true, message: '' };
+}
+
+function getCustomSetupSummary(setup) {
+  const cpuRunners = setup.runners - (setup.humanRole === ROLE.RUNNER ? setup.humanCount : 0);
+  const cpuChasers = setup.chasers - (setup.humanRole === ROLE.CHASER ? setup.humanCount : 0);
+  const roleLabel = setup.humanRole === ROLE.RUNNER ? 'runner' : 'chaser';
+  const difficultyLabel =
+    DIFFICULTY_CONFIG[setup.cpuDifficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
+  return `Custom: ${setup.runners}R vs ${setup.chasers}C | Humans: ${setup.humanCount} ${roleLabel}(s) | CPUs: ${setup.cpuCount} (${cpuRunners}R/${cpuChasers}C) | CPU difficulty: ${difficultyLabel}`;
+}
+
+function readCustomSetupFromInputs() {
+  return {
+    runners: parseIntegerInput(view.customRunnersInput?.value, 1),
+    chasers: parseIntegerInput(view.customChasersInput?.value, 1),
+    humanRole: view.customHumanRoleSelect?.value === ROLE.CHASER ? ROLE.CHASER : ROLE.RUNNER,
+    humanCount: parseIntegerInput(view.customHumanCountInput?.value, 1),
+    cpuCount: parseIntegerInput(view.customCpuCountInput?.value, 0),
+    cpuDifficulty: DIFFICULTY_CONFIG[view.customDifficultySelect?.value]
+      ? view.customDifficultySelect.value
+      : DIFFICULTY.NORMAL
+  };
+}
+
 function createEntitiesForCurrentMode() {
   if (state.mode === MODE.SINGLE_PLAYER) {
     return createEntitiesForSinglePlayer();
@@ -430,6 +521,10 @@ function createEntitiesForCurrentMode() {
 
   if (state.mode === MODE.THREE_VS_THREE) {
     return createEntitiesForLocalTeamMode(3);
+  }
+
+  if (state.mode === MODE.CUSTOM) {
+    return createEntitiesForCustomMode();
   }
 
   console.warn(`Mode "${state.mode}" is not implemented yet. Falling back to single-player.`);
@@ -511,6 +606,63 @@ function createEntitiesForLocalTeamMode(teamSize) {
   return entities;
 }
 
+function createEntitiesForCustomMode() {
+  const validation = getCustomSetupValidation(state.customSetup);
+  if (!validation.isValid) {
+    return [];
+  }
+
+  const setup = state.customSetup;
+  const blueRole = setup.humanRole;
+  const redRole = getOppositeRole(blueRole);
+  const blueCount = getCustomRoleCount(setup, blueRole);
+  const redCount = getCustomRoleCount(setup, redRole);
+  const blueHumanCount = Math.min(setup.humanCount, blueCount);
+  const blueCpuCount = Math.max(0, blueCount - blueHumanCount);
+  const entities = [];
+  const blueColors = ['#3b82f6', '#60a5fa', '#2563eb', '#1d4ed8', '#93c5fd', '#0ea5e9'];
+  const redColors = ['#ef4444', '#f87171', '#dc2626', '#b91c1c', '#fb7185', '#f43f5e'];
+
+  for (let i = 0; i < blueHumanCount; i += 1) {
+    entities.push(
+      createHumanEntity({
+        id: `custom-blue-human-${i + 1}`,
+        side: SIDE.BLUE,
+        role: blueRole,
+        color: blueColors[i % blueColors.length],
+        controlMapping: CONTROL_MAPPINGS.ARROW_WASD
+      })
+    );
+  }
+
+  for (let i = 0; i < blueCpuCount; i += 1) {
+    const colorIndex = (i + blueHumanCount) % blueColors.length;
+    entities.push(
+      createCpuEntity({
+        id: `custom-blue-cpu-${i + 1}`,
+        side: SIDE.BLUE,
+        role: blueRole,
+        color: blueColors[colorIndex],
+        difficulty: setup.cpuDifficulty
+      })
+    );
+  }
+
+  for (let i = 0; i < redCount; i += 1) {
+    entities.push(
+      createCpuEntity({
+        id: `custom-red-cpu-${i + 1}`,
+        side: SIDE.RED,
+        role: redRole,
+        color: redColors[i % redColors.length],
+        difficulty: setup.cpuDifficulty
+      })
+    );
+  }
+
+  return entities;
+}
+
 function getOppositeRole(role) {
   return role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
 }
@@ -529,6 +681,9 @@ function getModeLabel() {
   if (state.mode === MODE.THREE_VS_THREE) {
     return 'LOCAL 3V3';
   }
+  if (state.mode === MODE.CUSTOM) {
+    return 'CUSTOM';
+  }
   return 'SINGLE PLAYER';
 }
 
@@ -537,10 +692,19 @@ function getRolesLabel() {
 }
 
 function getDifficultyLabel() {
-  if (state.mode !== MODE.SINGLE_PLAYER) {
+  if (state.mode === MODE.SINGLE_PLAYER) {
+    return DIFFICULTY_CONFIG[state.difficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
+  }
+  if (state.mode === MODE.CUSTOM && state.customSetup.cpuCount > 0) {
+    return (
+      DIFFICULTY_CONFIG[state.customSetup.cpuDifficulty]?.label ??
+      DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label
+    );
+  }
+  if (state.mode === MODE.CUSTOM && state.customSetup.cpuCount <= 0) {
     return 'N/A';
   }
-  return DIFFICULTY_CONFIG[state.difficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
+  return 'N/A';
 }
 
 function getInstructionsText() {
@@ -549,6 +713,9 @@ function getInstructionsText() {
   }
   if (state.mode === MODE.TWO_VS_TWO || state.mode === MODE.THREE_VS_THREE) {
     return 'Local team mode: Blue team uses WASD (shared), Red team uses Arrow Keys (shared). All teammates move together.';
+  }
+  if (state.mode === MODE.CUSTOM) {
+    return 'Custom mode: all human-controlled entities move together with WASD or Arrow Keys.';
   }
   return 'Single Player: Blue (you) moves with WASD or Arrow Keys. Red CPU moves automatically.';
 }
@@ -572,6 +739,10 @@ function isLocalVersusMode(mode) {
   return mode === MODE.ONE_VS_ONE || mode === MODE.TWO_VS_TWO || mode === MODE.THREE_VS_THREE;
 }
 
+function isTeamOutcomeMode(mode) {
+  return isLocalVersusMode(mode) || mode === MODE.CUSTOM;
+}
+
 function removeTaggedRunners(entities, taggedRunnerIds) {
   return entities.filter((entity) => !(entity.role === ROLE.RUNNER && taggedRunnerIds.has(entity.id)));
 }
@@ -587,17 +758,30 @@ function getCountdownValue() {
 function renderHUD() {
   const isRoundActive = state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN;
   const activeCounts = countActiveByRole(state.entities);
+  const isCustomMode = state.mode === MODE.CUSTOM;
+  const customValidation = isCustomMode ? getCustomSetupValidation(state.customSetup) : { isValid: true };
   view.roleEl.textContent = getRolesLabel();
   view.modeEl.textContent = getModeLabel();
   view.difficultyEl.textContent = getDifficultyLabel();
   view.timerEl.textContent = String(Math.ceil(state.remainingMs / 1000));
   view.scoreEl.textContent = `${state.score.runnerWins}-${state.score.chaserWins}`;
   view.activeCountsEl.textContent = `${activeCounts.runners}-${activeCounts.chasers}`;
-  view.roleRunnerBtn.disabled = isRoundActive;
-  view.roleChaserBtn.disabled = isRoundActive;
+  view.roleRunnerBtn.disabled = isRoundActive || isCustomMode;
+  view.roleChaserBtn.disabled = isRoundActive || isCustomMode;
   view.modeSelect.disabled = isRoundActive;
   view.difficultySelect.disabled = isRoundActive || state.mode !== MODE.SINGLE_PLAYER;
-  view.startBtn.disabled = isRoundActive;
+  view.startBtn.disabled = isRoundActive || (isCustomMode && !customValidation.isValid);
+  view.customSetupPanel.hidden = !isCustomMode;
+
+  if (view.customRunnersInput) {
+    const shouldDisableCustomFields = isRoundActive || !isCustomMode;
+    view.customRunnersInput.disabled = shouldDisableCustomFields;
+    view.customChasersInput.disabled = shouldDisableCustomFields;
+    view.customHumanRoleSelect.disabled = shouldDisableCustomFields;
+    view.customHumanCountInput.disabled = shouldDisableCustomFields;
+    view.customCpuCountInput.disabled = shouldDisableCustomFields;
+    view.customDifficultySelect.disabled = shouldDisableCustomFields;
+  }
 
   if (state.phase === PHASE.COUNTDOWN) {
     view.countdownEl.textContent = String(getCountdownValue());
@@ -608,6 +792,18 @@ function renderHUD() {
 
 function renderInstructions() {
   view.instructionsEl.textContent = getInstructionsText();
+}
+
+function renderCustomSetup() {
+  if (state.mode !== MODE.CUSTOM) {
+    view.customValidationMessage.textContent = '';
+    view.customSummaryEl.textContent = '';
+    return;
+  }
+
+  const validation = getCustomSetupValidation(state.customSetup);
+  view.customValidationMessage.textContent = validation.isValid ? '' : validation.message;
+  view.customSummaryEl.textContent = getCustomSetupSummary(state.customSetup);
 }
 
 function renderEntities() {
@@ -637,6 +833,7 @@ function render() {
   renderHUD();
   renderEntities();
   renderInstructions();
+  renderCustomSetup();
 }
 
 function endRound(resultText, winningRole) {
@@ -703,7 +900,7 @@ function resolveCollision() {
 
   const activeCounts = countActiveByRole(state.entities);
   if (activeCounts.runners <= 0) {
-    if (isLocalVersusMode(state.mode)) {
+    if (isTeamOutcomeMode(state.mode)) {
       endRound('Chaser side wins: all runners were tagged', ROLE.CHASER);
       return;
     }
@@ -816,13 +1013,26 @@ function updateCpuMovement(deltaMs) {
 }
 
 function startRound() {
+  if (state.mode === MODE.CUSTOM) {
+    const validation = getCustomSetupValidation(state.customSetup);
+    if (!validation.isValid) {
+      setRoundResult(`Custom setup invalid: ${validation.message}`);
+      render();
+      return;
+    }
+  }
+
   state.entities = createEntitiesForCurrentMode();
   spawnEntities(state.entities);
 
   state.remainingMs = CONFIG.ROUND_MS;
   state.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
   state.phase = PHASE.COUNTDOWN;
-  setRoundResult(`Starting in ${CONFIG.COUNTDOWN_SECONDS}`);
+  if (state.mode === MODE.CUSTOM) {
+    setRoundResult(`${getCustomSetupSummary(state.customSetup)} | Starting in ${CONFIG.COUNTDOWN_SECONDS}`);
+  } else {
+    setRoundResult(`Starting in ${CONFIG.COUNTDOWN_SECONDS}`);
+  }
   render();
 }
 
@@ -844,7 +1054,7 @@ function updatePlaying(deltaMs) {
   }
 
   if (state.remainingMs <= 0) {
-    if (isLocalVersusMode(state.mode)) {
+    if (isTeamOutcomeMode(state.mode)) {
       endRound('Runner side wins: at least one runner survived 60 seconds', ROLE.RUNNER);
     } else if (state.role === ROLE.RUNNER) {
       endRound('You survived', ROLE.RUNNER);
@@ -902,6 +1112,9 @@ function setRole(role) {
   if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
     return;
   }
+  if (state.mode === MODE.CUSTOM) {
+    return;
+  }
   state.role = role;
   setRoundResult('Press Start Game');
   renderHUD();
@@ -928,19 +1141,72 @@ function setMode(mode) {
     mode !== MODE.SINGLE_PLAYER &&
     mode !== MODE.ONE_VS_ONE &&
     mode !== MODE.TWO_VS_TWO &&
-    mode !== MODE.THREE_VS_THREE
+    mode !== MODE.THREE_VS_THREE &&
+    mode !== MODE.CUSTOM
   ) {
     return;
   }
   state.mode = mode;
-  state.entities = createEntitiesForCurrentMode();
-  spawnEntities(state.entities);
-  setRoundResult('Press Start Game');
+
+  if (mode === MODE.CUSTOM) {
+    state.role = state.customSetup.humanRole;
+    const validation = getCustomSetupValidation(state.customSetup);
+    if (validation.isValid) {
+      state.entities = createEntitiesForCurrentMode();
+      spawnEntities(state.entities);
+      setRoundResult(`${getCustomSetupSummary(state.customSetup)}. Press Start Game`);
+    } else {
+      state.entities = [];
+      setRoundResult(`Custom setup invalid: ${validation.message}`);
+    }
+  } else {
+    state.entities = createEntitiesForCurrentMode();
+    spawnEntities(state.entities);
+    setRoundResult('Press Start Game');
+  }
+
   render();
+}
+
+function setCustomSetup(nextSetup) {
+  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
+    return;
+  }
+
+  state.customSetup = nextSetup;
+  state.role = nextSetup.humanRole;
+  const validation = getCustomSetupValidation(nextSetup);
+
+  if (state.mode === MODE.CUSTOM) {
+    if (validation.isValid) {
+      state.entities = createEntitiesForCurrentMode();
+      spawnEntities(state.entities);
+      setRoundResult(`${getCustomSetupSummary(nextSetup)}. Press Start Game`);
+    } else {
+      state.entities = [];
+      setRoundResult(`Custom setup invalid: ${validation.message}`);
+    }
+    render();
+    return;
+  }
+
+  renderHUD();
+  renderInstructions();
+}
+
+function onCustomSetupInputChange() {
+  setCustomSetup(readCustomSetupFromInputs());
 }
 
 function init() {
   buildGrid();
+
+  view.customRunnersInput.value = String(state.customSetup.runners);
+  view.customChasersInput.value = String(state.customSetup.chasers);
+  view.customHumanRoleSelect.value = state.customSetup.humanRole;
+  view.customHumanCountInput.value = String(state.customSetup.humanCount);
+  view.customCpuCountInput.value = String(state.customSetup.cpuCount);
+  view.customDifficultySelect.value = state.customSetup.cpuDifficulty;
 
   // See README "Entity architecture" for the full organization and system breakdown.
   state.entities = createEntitiesForCurrentMode();
@@ -954,6 +1220,12 @@ function init() {
   view.roleChaserBtn.addEventListener('click', () => setRole(ROLE.CHASER));
   view.modeSelect.addEventListener('change', (event) => setMode(event.target.value));
   view.difficultySelect.addEventListener('change', (event) => setDifficulty(event.target.value));
+  view.customRunnersInput.addEventListener('input', onCustomSetupInputChange);
+  view.customChasersInput.addEventListener('input', onCustomSetupInputChange);
+  view.customHumanRoleSelect.addEventListener('change', onCustomSetupInputChange);
+  view.customHumanCountInput.addEventListener('input', onCustomSetupInputChange);
+  view.customCpuCountInput.addEventListener('input', onCustomSetupInputChange);
+  view.customDifficultySelect.addEventListener('change', onCustomSetupInputChange);
 
   requestAnimationFrame(gameLoop);
 }
