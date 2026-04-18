@@ -185,6 +185,7 @@ const view = {
   difficultyEl: document.getElementById('difficulty-value'),
   timerEl: document.getElementById('timer-value'),
   scoreEl: document.getElementById('score-value'),
+  activeCountsEl: document.getElementById('active-counts-value'),
   countdownEl: document.getElementById('countdown-value'),
   resultEl: document.getElementById('result-value'),
   instructionsEl: document.getElementById('instructions-value'),
@@ -323,15 +324,73 @@ function getSpawnQueueForSide(side) {
   return points;
 }
 
+function getPreferredSpawnPoints(side, count) {
+  const max = CONFIG.GRID_SIZE - 1;
+  const cornerAnchors =
+    side === SIDE.BLUE
+      ? [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+          { x: 0, y: 1 },
+          { x: 1, y: 1 },
+          { x: 2, y: 0 },
+          { x: 0, y: 2 }
+        ]
+      : [
+          { x: max, y: max },
+          { x: max - 1, y: max },
+          { x: max, y: max - 1 },
+          { x: max - 1, y: max - 1 },
+          { x: max - 2, y: max },
+          { x: max, y: max - 2 }
+        ];
+
+  return cornerAnchors.slice(0, count).map(clampToGrid);
+}
+
 function spawnEntities(entities) {
   const sideQueues = new Map();
   const sideQueueIndexes = new Map();
+  const sidePreferred = new Map();
+  const sidePreferredIndexes = new Map();
+  const sideCounts = new Map();
   const occupied = new Set();
+
+  for (const entity of entities) {
+    sideCounts.set(entity.side, (sideCounts.get(entity.side) ?? 0) + 1);
+  }
 
   for (const entity of entities) {
     if (!sideQueues.has(entity.side)) {
       sideQueues.set(entity.side, getSpawnQueueForSide(entity.side));
       sideQueueIndexes.set(entity.side, 0);
+      sidePreferred.set(entity.side, getPreferredSpawnPoints(entity.side, sideCounts.get(entity.side) ?? 0));
+      sidePreferredIndexes.set(entity.side, 0);
+    }
+
+    const preferredQueue = sidePreferred.get(entity.side);
+    let preferredIndex = sidePreferredIndexes.get(entity.side);
+    let assigned = false;
+
+    while (preferredIndex < preferredQueue.length) {
+      const spawnPoint = preferredQueue[preferredIndex];
+      const positionKey = toIndex(spawnPoint.x, spawnPoint.y);
+      preferredIndex += 1;
+
+      if (occupied.has(positionKey)) {
+        continue;
+      }
+
+      entity.x = spawnPoint.x;
+      entity.y = spawnPoint.y;
+      occupied.add(positionKey);
+      assigned = true;
+      break;
+    }
+
+    sidePreferredIndexes.set(entity.side, preferredIndex);
+    if (assigned) {
+      continue;
     }
 
     const queue = sideQueues.get(entity.side);
@@ -363,6 +422,14 @@ function createEntitiesForCurrentMode() {
 
   if (state.mode === MODE.ONE_VS_ONE) {
     return createEntitiesForLocalOneVsOne();
+  }
+
+  if (state.mode === MODE.TWO_VS_TWO) {
+    return createEntitiesForLocalTeamMode(2);
+  }
+
+  if (state.mode === MODE.THREE_VS_THREE) {
+    return createEntitiesForLocalTeamMode(3);
   }
 
   console.warn(`Mode "${state.mode}" is not implemented yet. Falling back to single-player.`);
@@ -411,6 +478,39 @@ function createEntitiesForLocalOneVsOne() {
   ];
 }
 
+function createEntitiesForLocalTeamMode(teamSize) {
+  const redRole = getOppositeRole(state.role);
+  const blueColors = ['#3b82f6', '#60a5fa', '#2563eb'];
+  const redColors = ['#ef4444', '#f87171', '#dc2626'];
+  const entities = [];
+
+  for (let i = 0; i < teamSize; i += 1) {
+    entities.push(
+      createHumanEntity({
+        id: `blue-player-${i + 1}`,
+        side: SIDE.BLUE,
+        role: state.role,
+        color: blueColors[i] ?? blueColors[blueColors.length - 1],
+        controlMapping: CONTROL_MAPPINGS.WASD
+      })
+    );
+  }
+
+  for (let i = 0; i < teamSize; i += 1) {
+    entities.push(
+      createHumanEntity({
+        id: `red-player-${i + 1}`,
+        side: SIDE.RED,
+        role: redRole,
+        color: redColors[i] ?? redColors[redColors.length - 1],
+        controlMapping: CONTROL_MAPPINGS.ARROWS
+      })
+    );
+  }
+
+  return entities;
+}
+
 function getOppositeRole(role) {
   return role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
 }
@@ -422,6 +522,12 @@ function getRoleLabel(role) {
 function getModeLabel() {
   if (state.mode === MODE.ONE_VS_ONE) {
     return 'LOCAL 1V1';
+  }
+  if (state.mode === MODE.TWO_VS_TWO) {
+    return 'LOCAL 2V2';
+  }
+  if (state.mode === MODE.THREE_VS_THREE) {
+    return 'LOCAL 3V3';
   }
   return 'SINGLE PLAYER';
 }
@@ -441,7 +547,33 @@ function getInstructionsText() {
   if (state.mode === MODE.ONE_VS_ONE) {
     return 'Local 1v1: Blue player uses WASD, Red player uses Arrow Keys.';
   }
+  if (state.mode === MODE.TWO_VS_TWO || state.mode === MODE.THREE_VS_THREE) {
+    return 'Local team mode: Blue team uses WASD (shared), Red team uses Arrow Keys (shared). All teammates move together.';
+  }
   return 'Single Player: Blue (you) moves with WASD or Arrow Keys. Red CPU moves automatically.';
+}
+
+function countActiveByRole(entities) {
+  let runners = 0;
+  let chasers = 0;
+
+  for (const entity of entities) {
+    if (entity.role === ROLE.RUNNER) {
+      runners += 1;
+    } else if (entity.role === ROLE.CHASER) {
+      chasers += 1;
+    }
+  }
+
+  return { runners, chasers };
+}
+
+function isLocalVersusMode(mode) {
+  return mode === MODE.ONE_VS_ONE || mode === MODE.TWO_VS_TWO || mode === MODE.THREE_VS_THREE;
+}
+
+function removeTaggedRunners(entities, taggedRunnerIds) {
+  return entities.filter((entity) => !(entity.role === ROLE.RUNNER && taggedRunnerIds.has(entity.id)));
 }
 
 function setRoundResult(text) {
@@ -454,11 +586,13 @@ function getCountdownValue() {
 
 function renderHUD() {
   const isRoundActive = state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN;
+  const activeCounts = countActiveByRole(state.entities);
   view.roleEl.textContent = getRolesLabel();
   view.modeEl.textContent = getModeLabel();
   view.difficultyEl.textContent = getDifficultyLabel();
   view.timerEl.textContent = String(Math.ceil(state.remainingMs / 1000));
   view.scoreEl.textContent = `${state.score.runnerWins}-${state.score.chaserWins}`;
+  view.activeCountsEl.textContent = `${activeCounts.runners}-${activeCounts.chasers}`;
   view.roleRunnerBtn.disabled = isRoundActive;
   view.roleChaserBtn.disabled = isRoundActive;
   view.modeSelect.disabled = isRoundActive;
@@ -560,17 +694,27 @@ function resolveCollision() {
     return;
   }
 
-  if (state.mode === MODE.ONE_VS_ONE) {
-    endRound('Chaser side wins: runner was tagged', ROLE.CHASER);
+  const taggedRunnerIds = new Set(tagEvents.map((event) => event.runner.id));
+  if (taggedRunnerIds.size === 0) {
     return;
   }
 
-  if (state.role === ROLE.CHASER) {
-    endRound('You caught the CPU', ROLE.CHASER);
-    return;
-  }
+  state.entities = removeTaggedRunners(state.entities, taggedRunnerIds);
 
-  endRound('You were caught', ROLE.CHASER);
+  const activeCounts = countActiveByRole(state.entities);
+  if (activeCounts.runners <= 0) {
+    if (isLocalVersusMode(state.mode)) {
+      endRound('Chaser side wins: all runners were tagged', ROLE.CHASER);
+      return;
+    }
+
+    if (state.role === ROLE.CHASER) {
+      endRound('You caught the CPU', ROLE.CHASER);
+      return;
+    }
+
+    endRound('You were caught', ROLE.CHASER);
+  }
 }
 
 function moveEntity(entity, delta) {
@@ -700,8 +844,8 @@ function updatePlaying(deltaMs) {
   }
 
   if (state.remainingMs <= 0) {
-    if (state.mode === MODE.ONE_VS_ONE) {
-      endRound('Runner side wins: survived 60 seconds', ROLE.RUNNER);
+    if (isLocalVersusMode(state.mode)) {
+      endRound('Runner side wins: at least one runner survived 60 seconds', ROLE.RUNNER);
     } else if (state.role === ROLE.RUNNER) {
       endRound('You survived', ROLE.RUNNER);
     } else {
@@ -780,7 +924,12 @@ function setMode(mode) {
   if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
     return;
   }
-  if (mode !== MODE.SINGLE_PLAYER && mode !== MODE.ONE_VS_ONE) {
+  if (
+    mode !== MODE.SINGLE_PLAYER &&
+    mode !== MODE.ONE_VS_ONE &&
+    mode !== MODE.TWO_VS_TWO &&
+    mode !== MODE.THREE_VS_THREE
+  ) {
     return;
   }
   state.mode = mode;
