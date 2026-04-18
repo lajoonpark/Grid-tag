@@ -1,0 +1,133 @@
+:root {
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --cell: #0b1220;
+  --cell-border: #334155;
+  --runner: #22c55e;
+  --chaser: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at top, #1e293b, var(--bg));
+  color: var(--text);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 1rem;
+}
+
+.app-shell {
+  width: min(100%, 980px);
+  display: grid;
+  gap: 1rem;
+}
+
+.hud {
+  background: var(--panel);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  align-items: center;
+}
+
+.hud-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.hud-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+button,
+select {
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #0f172a;
+  color: var(--text);
+  padding: 0.45rem 0.7rem;
+}
+
+button:hover {
+  background: #1d4ed8;
+  cursor: pointer;
+}
+
+.mode-panel {
+  background: var(--panel);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.mode-panel h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.mode-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.game-area {
+  background: var(--panel);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 0.75rem;
+  overflow: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(30, 20px);
+  grid-template-rows: repeat(30, 20px);
+  gap: 1px;
+  width: max-content;
+  margin: 0 auto;
+}
+
+.cell {
+  width: 20px;
+  height: 20px;
+  background: var(--cell);
+  border: 1px solid var(--cell-border);
+}
+
+.cell.runner {
+  background: var(--runner);
+}
+
+.cell.chaser {
+  background: var(--chaser);
+}
+
+.instructions {
+  margin: 0;
+  color: var(--muted);
+  text-align: center;
+}

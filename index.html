@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grid Tag</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hud" aria-label="Game HUD">
+      <div class="hud-item">
+        <span class="label">Role</span>
+        <strong id="role-value">Runner</strong>
+      </div>
+      <div class="hud-item">
+        <span class="label">Timer</span>
+        <strong id="timer-value">60</strong>
+      </div>
+      <div class="hud-item">
+        <span class="label">Score</span>
+        <strong id="score-value">0</strong>
+      </div>
+      <div class="hud-controls">
+        <button id="start-btn" type="button">Start</button>
+        <button id="pause-btn" type="button">Pause</button>
+        <button id="reset-btn" type="button">Reset</button>
+      </div>
+    </header>
+
+    <section class="mode-panel" aria-label="Mode selection">
+      <h2>Game Mode (Placeholder)</h2>
+      <label for="mode-select">Select mode:</label>
+      <select id="mode-select" disabled>
+        <option value="single-player" selected>Single Player (current)</option>
+        <option value="split-screen">Split-Screen Multiplayer (planned)</option>
+        <option value="1v1">1v1 (planned)</option>
+        <option value="2v2">2v2 (planned)</option>
+        <option value="3v3">3v3 (planned)</option>
+      </select>
+      <p class="mode-note">Mode system is wired for future expansion.</p>
+    </section>
+
+    <section class="game-area" aria-label="Grid chase game area">
+      <div id="grid" class="grid" role="grid" aria-label="30 by 30 game grid"></div>
+    </section>
+
+    <p class="instructions">Move with Arrow Keys or WASD. Avoid the CPU chaser until the timer ends.</p>
+  </main>
+
+  <script src="main.js"></script>
+</body>
+</html>
