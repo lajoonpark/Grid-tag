@@ -99,14 +99,17 @@ function setRoundResult(text) {
   view.resultEl.textContent = text;
 }
 
+function getCountdownValue() {
+  return Math.max(1, Math.ceil(state.countdownMs / 1000));
+}
+
 function renderHUD() {
   view.roleEl.textContent = getRoleLabel();
   view.timerEl.textContent = String(Math.ceil(state.remainingMs / 1000));
   view.scoreEl.textContent = `${state.score.wins}-${state.score.losses}`;
 
   if (state.phase === PHASE.COUNTDOWN) {
-    const value = Math.max(1, Math.ceil(state.countdownMs / 1000));
-    view.countdownEl.textContent = String(value);
+    view.countdownEl.textContent = String(getCountdownValue());
   } else {
     view.countdownEl.textContent = '-';
   }
@@ -179,8 +182,8 @@ function moveCpuAsChaser() {
   const xStep = stepToward(state.human.x, state.cpu.x);
   const yStep = stepToward(state.human.y, state.cpu.y);
 
-  const prioritizeX = Math.abs(state.human.x - state.cpu.x) >= Math.abs(state.human.y - state.cpu.y);
-  if (prioritizeX && xStep !== 0) {
+  const shouldMoveHorizontallyFirst = Math.abs(state.human.x - state.cpu.x) >= Math.abs(state.human.y - state.cpu.y);
+  if (shouldMoveHorizontallyFirst && xStep !== 0) {
     tryMoveCpu({ x: xStep, y: 0 });
   } else if (yStep !== 0) {
     tryMoveCpu({ x: 0, y: yStep });
@@ -249,8 +252,7 @@ function startRound() {
 
 function updateCountdown(deltaMs) {
   state.countdownMs = Math.max(0, state.countdownMs - deltaMs);
-  const countValue = Math.max(1, Math.ceil(state.countdownMs / 1000));
-  setRoundResult(`Starting in ${countValue}`);
+  setRoundResult(`Starting in ${getCountdownValue()}`);
   if (state.countdownMs <= 0) {
     state.phase = PHASE.PLAYING;
     setRoundResult('Round in progress');
