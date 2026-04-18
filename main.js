@@ -16,11 +16,25 @@ const ROLE = {
   CHASER: 'chaser'
 };
 
+const SIDE = {
+  PLAYER: 'player',
+  CPU: 'cpu'
+};
+
 const DIFFICULTY = {
   NORMAL: 'normal',
   HARD: 'hard',
   INSANE: 'insane',
   DEMON: 'demon'
+};
+
+const MODE = {
+  SINGLE_PLAYER: 'single-player',
+  SPLIT_SCREEN: 'split-screen',
+  ONE_VS_ONE: '1v1',
+  TWO_VS_TWO: '2v2',
+  THREE_VS_THREE: '3v3',
+  CUSTOM: 'custom'
 };
 
 const DIFFICULTY_CONFIG = {
@@ -30,6 +44,58 @@ const DIFFICULTY_CONFIG = {
   [DIFFICULTY.HARD]: { label: 'HARD', optimalChance: 0.8, minSpeed: 4, maxSpeed: 7 },
   [DIFFICULTY.INSANE]: { label: 'INSANE', optimalChance: 0.95, minSpeed: 7, maxSpeed: 10 },
   [DIFFICULTY.DEMON]: { label: 'DEMON', optimalChance: 1, minSpeed: 10, maxSpeed: 14 }
+};
+
+const MODE_PRESETS = {
+  [MODE.SINGLE_PLAYER]: {
+    description: 'Current mode: one human vs one CPU',
+    sides: {
+      [SIDE.PLAYER]: 1,
+      [SIDE.CPU]: 1
+    }
+  },
+  [MODE.SPLIT_SCREEN]: {
+    description: 'Reserved for multiple human-controlled entities with independent cameras',
+    sides: {}
+  },
+  [MODE.ONE_VS_ONE]: {
+    description: 'Reserved for one entity per side',
+    sides: {
+      [SIDE.PLAYER]: 1,
+      [SIDE.CPU]: 1
+    }
+  },
+  [MODE.TWO_VS_TWO]: {
+    description: 'Reserved for two entities per side',
+    sides: {
+      [SIDE.PLAYER]: 2,
+      [SIDE.CPU]: 2
+    }
+  },
+  [MODE.THREE_VS_THREE]: {
+    description: 'Reserved for three entities per side',
+    sides: {
+      [SIDE.PLAYER]: 3,
+      [SIDE.CPU]: 3
+    }
+  },
+  [MODE.CUSTOM]: {
+    description: 'Reserved for arbitrary counts per side',
+    sides: {}
+  }
+};
+
+const CONTROL_MAPPINGS = {
+  ARROW_WASD: {
+    ArrowUp: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 },
+    ArrowLeft: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 },
+    w: { x: 0, y: -1 },
+    s: { x: 0, y: 1 },
+    a: { x: -1, y: 0 },
+    d: { x: 1, y: 0 }
+  }
 };
 
 class CpuDecisionEngine {
@@ -98,17 +164,6 @@ class CpuDecisionEngine {
 
 const cpuDecisionEngine = new CpuDecisionEngine(CONFIG.GRID_SIZE, DIFFICULTY_CONFIG);
 
-const inputDelta = {
-  ArrowUp: { x: 0, y: -1 },
-  ArrowDown: { x: 0, y: 1 },
-  ArrowLeft: { x: -1, y: 0 },
-  ArrowRight: { x: 1, y: 0 },
-  w: { x: 0, y: -1 },
-  s: { x: 0, y: 1 },
-  a: { x: -1, y: 0 },
-  d: { x: 1, y: 0 }
-};
-
 const view = {
   gridEl: document.getElementById('grid'),
   roleEl: document.getElementById('role-value'),
@@ -128,12 +183,10 @@ const state = {
   phase: PHASE.IDLE,
   role: ROLE.RUNNER,
   difficulty: DIFFICULTY.NORMAL,
-  human: { x: 0, y: 0 },
-  cpu: { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 },
+  mode: MODE.SINGLE_PLAYER,
+  entities: [],
   remainingMs: CONFIG.ROUND_MS,
   countdownMs: CONFIG.COUNTDOWN_SECONDS * 1000,
-  cpuStepMs: 500,
-  cpuAccumulatorMs: 0,
   score: {
     wins: 0,
     losses: 0
@@ -167,9 +220,156 @@ function buildGrid() {
   view.gridEl.appendChild(fragment);
 }
 
-function resetPositions() {
-  state.human = { x: 0, y: 0 };
-  state.cpu = { x: CONFIG.GRID_SIZE - 1, y: CONFIG.GRID_SIZE - 1 };
+function randomInRange(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function pickCpuStepMsForRound(difficulty) {
+  const config = DIFFICULTY_CONFIG[difficulty] ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL];
+  const speed = randomInRange(config.minSpeed, config.maxSpeed);
+  return 1000 / speed;
+}
+
+function createEntity({
+  id,
+  side,
+  role,
+  color,
+  x = 0,
+  y = 0,
+  isHuman = false,
+  isCPU = false,
+  controlMapping = null,
+  cpuSettings = null
+}) {
+  return {
+    id,
+    side,
+    role,
+    color,
+    x,
+    y,
+    isHuman,
+    isCPU,
+    controlMapping,
+    cpuSettings
+  };
+}
+
+function createHumanEntity({ id, side, role, color, controlMapping }) {
+  return createEntity({
+    id,
+    side,
+    role,
+    color,
+    isHuman: true,
+    isCPU: false,
+    controlMapping,
+    cpuSettings: null
+  });
+}
+
+function createCpuEntity({ id, side, role, color, difficulty }) {
+  return createEntity({
+    id,
+    side,
+    role,
+    color,
+    isHuman: false,
+    isCPU: true,
+    controlMapping: null,
+    cpuSettings: {
+      difficulty,
+      stepMs: pickCpuStepMsForRound(difficulty),
+      accumulatorMs: 0
+    }
+  });
+}
+
+function getSpawnQueueForSide(side) {
+  const points = [];
+
+  if (side === SIDE.PLAYER) {
+    for (let y = 0; y < CONFIG.GRID_SIZE; y += 1) {
+      for (let x = 0; x < CONFIG.GRID_SIZE; x += 1) {
+        points.push({ x, y });
+      }
+    }
+    return points;
+  }
+
+  for (let y = CONFIG.GRID_SIZE - 1; y >= 0; y -= 1) {
+    for (let x = CONFIG.GRID_SIZE - 1; x >= 0; x -= 1) {
+      points.push({ x, y });
+    }
+  }
+  return points;
+}
+
+function spawnEntities(entities) {
+  const sideQueues = new Map();
+  const sideQueueIndexes = new Map();
+  const occupied = new Set();
+
+  for (const entity of entities) {
+    if (!sideQueues.has(entity.side)) {
+      sideQueues.set(entity.side, getSpawnQueueForSide(entity.side));
+      sideQueueIndexes.set(entity.side, 0);
+    }
+
+    const queue = sideQueues.get(entity.side);
+    let queueIndex = sideQueueIndexes.get(entity.side) ?? 0;
+
+    while (queueIndex < queue.length) {
+      const spawnPoint = queue[queueIndex];
+      const key = toIndex(spawnPoint.x, spawnPoint.y);
+      queueIndex += 1;
+
+      if (occupied.has(key)) {
+        continue;
+      }
+
+      entity.x = spawnPoint.x;
+      entity.y = spawnPoint.y;
+      occupied.add(key);
+      break;
+    }
+
+    sideQueueIndexes.set(entity.side, queueIndex);
+  }
+}
+
+function createEntitiesForCurrentMode() {
+  const modeConfig = MODE_PRESETS[state.mode] ?? MODE_PRESETS[MODE.SINGLE_PLAYER];
+
+  if (state.mode !== MODE.SINGLE_PLAYER) {
+    // Future modes are modeled with the same entity shape; only counts and control maps differ.
+    // For now we keep gameplay in the existing single-player behavior.
+    return createEntitiesForSinglePlayer();
+  }
+
+  return createEntitiesForSinglePlayer(modeConfig);
+}
+
+function createEntitiesForSinglePlayer() {
+  const cpuRole = state.role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
+
+  return [
+    createHumanEntity({
+      id: 'human-1',
+      side: SIDE.PLAYER,
+      role: state.role,
+      color: '#3b82f6',
+      controlMapping: CONTROL_MAPPINGS.ARROW_WASD
+    }),
+    createCpuEntity({
+      id: 'cpu-1',
+      side: SIDE.CPU,
+      role: cpuRole,
+      color: '#ef4444',
+      difficulty: state.difficulty
+    })
+  ];
 }
 
 function getRoleLabel() {
@@ -178,10 +378,6 @@ function getRoleLabel() {
 
 function getDifficultyLabel() {
   return DIFFICULTY_CONFIG[state.difficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
-}
-
-function isCollision() {
-  return state.human.x === state.cpu.x && state.human.y === state.cpu.y;
 }
 
 function setRoundResult(text) {
@@ -212,11 +408,25 @@ function renderHUD() {
 
 function renderEntities() {
   for (const cell of view.cells) {
-    cell.classList.remove('human', 'cpu');
+    cell.classList.remove('human', 'cpu', 'entity');
+    cell.style.removeProperty('background-color');
   }
 
-  view.cells[toIndex(state.human.x, state.human.y)]?.classList.add('human');
-  view.cells[toIndex(state.cpu.x, state.cpu.y)]?.classList.add('cpu');
+  for (const entity of state.entities) {
+    const cell = view.cells[toIndex(entity.x, entity.y)];
+    if (!cell) {
+      continue;
+    }
+
+    cell.classList.add('entity');
+    cell.style.backgroundColor = entity.color;
+
+    if (entity.isHuman) {
+      cell.classList.add('human');
+    } else if (entity.isCPU) {
+      cell.classList.add('cpu');
+    }
+  }
 }
 
 function render() {
@@ -235,62 +445,169 @@ function endRound(resultText, didWin) {
   renderHUD();
 }
 
+function findTagEvents(entities) {
+  const tiles = new Map();
+
+  for (const entity of entities) {
+    const key = `${entity.x},${entity.y}`;
+    if (!tiles.has(key)) {
+      tiles.set(key, []);
+    }
+    tiles.get(key).push(entity);
+  }
+
+  const events = [];
+
+  for (const sameTileEntities of tiles.values()) {
+    if (sameTileEntities.length < 2) {
+      continue;
+    }
+
+    const chasers = sameTileEntities.filter((entity) => entity.role === ROLE.CHASER);
+    const runners = sameTileEntities.filter((entity) => entity.role === ROLE.RUNNER);
+
+    for (const chaser of chasers) {
+      for (const runner of runners) {
+        if (chaser.side === runner.side) {
+          continue;
+        }
+        events.push({ chaser, runner });
+      }
+    }
+  }
+
+  return events;
+}
+
 function resolveCollision() {
-  if (!isCollision()) {
+  if (state.phase !== PHASE.PLAYING) {
     return;
   }
 
-  if (state.role === ROLE.CHASER) {
-    endRound('You caught the CPU', true);
-  } else {
+  const humanEntity = state.entities.find((entity) => entity.isHuman);
+  if (!humanEntity) {
+    return;
+  }
+
+  const tagEvents = findTagEvents(state.entities);
+  if (tagEvents.length === 0) {
+    return;
+  }
+
+  if (humanEntity.role === ROLE.CHASER) {
+    const humanTag = tagEvents.some((event) => event.chaser.id === humanEntity.id);
+    if (humanTag) {
+      endRound('You caught the CPU', true);
+    }
+    return;
+  }
+
+  const humanCaught = tagEvents.some((event) => event.runner.id === humanEntity.id);
+  if (humanCaught) {
     endRound('You were caught', false);
   }
 }
 
-function moveHuman(delta) {
-  state.human = clampToGrid({
-    x: state.human.x + delta.x,
-    y: state.human.y + delta.y
+function moveEntity(entity, delta) {
+  const next = clampToGrid({
+    x: entity.x + delta.x,
+    y: entity.y + delta.y
   });
+
+  entity.x = next.x;
+  entity.y = next.y;
+}
+
+function moveHumanByKey(key) {
+  let didMove = false;
+
+  for (const entity of state.entities) {
+    if (!entity.isHuman || !entity.controlMapping) {
+      continue;
+    }
+
+    const delta = entity.controlMapping[key];
+    if (!delta) {
+      continue;
+    }
+
+    moveEntity(entity, delta);
+    didMove = true;
+  }
+
+  if (!didMove) {
+    return;
+  }
+
   resolveCollision();
-  render();
+  renderEntities();
 }
 
-function tryMoveCpu(delta) {
-  state.cpu = clampToGrid({
-    x: state.cpu.x + delta.x,
-    y: state.cpu.y + delta.y
-  });
+function findNearestOpponent(entity, entities) {
+  const opponents = entities.filter((candidate) => candidate.side !== entity.side);
+  if (opponents.length === 0) {
+    return null;
+  }
+
+  let nearest = opponents[0];
+  let bestDistance = CpuDecisionEngine.manhattanDistance(entity, nearest);
+
+  for (let i = 1; i < opponents.length; i += 1) {
+    const candidate = opponents[i];
+    const distance = CpuDecisionEngine.manhattanDistance(entity, candidate);
+    if (distance < bestDistance) {
+      nearest = candidate;
+      bestDistance = distance;
+    }
+  }
+
+  return nearest;
 }
 
-function moveCpu() {
-  const cpuRole = state.role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER;
+function moveCpuEntity(cpuEntity) {
+  const target = findNearestOpponent(cpuEntity, state.entities);
+  if (!target) {
+    return;
+  }
+
   const delta = cpuDecisionEngine.decideMove({
-    cpuPosition: state.cpu,
-    humanPosition: state.human,
-    cpuRole,
-    difficulty: state.difficulty
+    cpuPosition: cpuEntity,
+    humanPosition: target,
+    cpuRole: cpuEntity.role,
+    difficulty: cpuEntity.cpuSettings?.difficulty ?? state.difficulty
   });
-  tryMoveCpu(delta);
-  resolveCollision();
+
+  moveEntity(cpuEntity, delta);
 }
 
-function randomInRange(min, max) {
-  return min + Math.random() * (max - min);
-}
+function updateCpuMovement(deltaMs) {
+  for (const entity of state.entities) {
+    if (!entity.isCPU || !entity.cpuSettings) {
+      continue;
+    }
 
-function pickCpuStepMsForRound(difficulty) {
-  const config = DIFFICULTY_CONFIG[difficulty] ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL];
-  const speed = randomInRange(config.minSpeed, config.maxSpeed);
-  return 1000 / speed;
+    entity.cpuSettings.accumulatorMs += deltaMs;
+
+    while (entity.cpuSettings.accumulatorMs >= entity.cpuSettings.stepMs && state.phase === PHASE.PLAYING) {
+      entity.cpuSettings.accumulatorMs -= entity.cpuSettings.stepMs;
+      moveCpuEntity(entity);
+      resolveCollision();
+
+      if (state.phase !== PHASE.PLAYING) {
+        return;
+      }
+    }
+  }
+
+  renderEntities();
 }
 
 function startRound() {
-  resetPositions();
+  state.entities = createEntitiesForCurrentMode();
+  spawnEntities(state.entities);
+
   state.remainingMs = CONFIG.ROUND_MS;
   state.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
-  state.cpuAccumulatorMs = 0;
-  state.cpuStepMs = pickCpuStepMsForRound(state.difficulty);
   state.phase = PHASE.COUNTDOWN;
   setRoundResult(`Starting in ${CONFIG.COUNTDOWN_SECONDS}`);
   render();
@@ -307,12 +624,7 @@ function updateCountdown(deltaMs) {
 
 function updatePlaying(deltaMs) {
   state.remainingMs = Math.max(0, state.remainingMs - deltaMs);
-  state.cpuAccumulatorMs += deltaMs;
-
-  while (state.cpuAccumulatorMs >= state.cpuStepMs && state.phase === PHASE.PLAYING) {
-    state.cpuAccumulatorMs -= state.cpuStepMs;
-    moveCpu();
-  }
+  updateCpuMovement(deltaMs);
 
   if (state.phase !== PHASE.PLAYING) {
     return;
@@ -350,13 +662,17 @@ function onKeydown(event) {
     return;
   }
 
-  const delta = inputDelta[event.key];
-  if (!delta) {
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  const hasHumanControl = state.entities.some(
+    (entity) => entity.isHuman && entity.controlMapping && entity.controlMapping[key]
+  );
+
+  if (!hasHumanControl) {
     return;
   }
 
   event.preventDefault();
-  moveHuman(delta);
+  moveHumanByKey(key);
 }
 
 function setRole(role) {
@@ -383,6 +699,13 @@ function setDifficulty(difficulty) {
 
 function init() {
   buildGrid();
+
+  // Entity organization:
+  // - `state.entities` is the single source of truth for every player/CPU unit.
+  // - Each entity carries identity, side, role, color, position, and control/CPU metadata.
+  // - Systems below (create/spawn/move/collision/render) are mode-agnostic and support future team sizes.
+  state.entities = createEntitiesForCurrentMode();
+  spawnEntities(state.entities);
   render();
 
   document.addEventListener('keydown', onKeydown);
