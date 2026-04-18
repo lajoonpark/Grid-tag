@@ -25,10 +25,23 @@
         <span class="label">Countdown</span>
         <strong id="countdown-value">-</strong>
       </div>
+      <div class="hud-item">
+        <span class="label">Difficulty</span>
+        <strong id="difficulty-value">NORMAL</strong>
+      </div>
       <div class="hud-controls">
         <button id="start-btn" type="button">Start Game</button>
         <button id="role-runner-btn" type="button">Choose Role: Runner</button>
         <button id="role-chaser-btn" type="button">Choose Role: Chaser</button>
+        <label class="difficulty-picker" for="difficulty-select">
+          <span class="label">CPU Difficulty</span>
+          <select id="difficulty-select">
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="insane">Insane</option>
+            <option value="demon">Demon</option>
+          </select>
+        </label>
       </div>
     </header>
 

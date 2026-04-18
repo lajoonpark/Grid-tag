@@ -24,6 +24,13 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
   - movement clamped to grid bounds
 - Opposite-corner spawning each round.
 - Round timer (60 seconds) and top HUD role display (`RUNNER`/`CHASER`).
+- Difficulty selector with four CPU difficulty levels:
+  - `Normal`: 70% optimal routing, speed random from 2 to 4 tiles/sec
+  - `Hard`: 80% optimal routing, speed random from 4 to 7 tiles/sec
+  - `Insane`: 95% optimal routing, speed random from 7 to 10 tiles/sec
+  - `Demon`: 100% optimal routing, speed random from 10 to 14 tiles/sec
+- Difficulty is shown in HUD and can be changed before round start.
+- CPU movement is tile-by-tile, role-aware (chase/evade), and clamped to grid bounds.
 - Collision on same tile counts as tag/catch.
 - Round result text:
   - `You survived`
