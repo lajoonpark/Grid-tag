@@ -117,6 +117,11 @@ const TEAM_COLORS = {
   [SIDE.RED]: ['#ef4444', '#f87171', '#dc2626', '#b91c1c', '#fb7185', '#f43f5e']
 };
 
+const LOCAL_TEAM_COLORS = {
+  [SIDE.BLUE]: ['#3b82f6', '#60a5fa', '#2563eb'],
+  [SIDE.RED]: ['#ef4444', '#f87171', '#dc2626']
+};
+
 class CpuDecisionEngine {
   constructor(gridSize, difficultyConfig) {
     this.gridSize = gridSize;
@@ -432,7 +437,7 @@ function spawnEntities(entities) {
 
 function parseIntegerInput(value, fallback, min = Number.NEGATIVE_INFINITY) {
   const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed)) {
+  if (Number.isNaN(parsed)) {
     return fallback;
   }
   return Math.max(min, parsed);
@@ -583,8 +588,8 @@ function createEntitiesForLocalOneVsOne() {
 
 function createEntitiesForLocalTeamMode(teamSize) {
   const redRole = getOppositeRole(state.role);
-  const blueColors = TEAM_COLORS[SIDE.BLUE];
-  const redColors = TEAM_COLORS[SIDE.RED];
+  const blueColors = LOCAL_TEAM_COLORS[SIDE.BLUE];
+  const redColors = LOCAL_TEAM_COLORS[SIDE.RED];
   const entities = [];
 
   for (let i = 0; i < teamSize; i += 1) {
