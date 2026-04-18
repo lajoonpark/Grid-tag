@@ -24,18 +24,30 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
   - movement clamped to grid bounds
 - Opposite-corner spawning each round.
 - Round timer (60 seconds) and top HUD role display (`RUNNER`/`CHASER`).
-- Difficulty selector with four CPU difficulty levels:
-  - `Normal`: 70% optimal routing, speed random from 2 to 4 tiles/sec
-  - `Hard`: 80% optimal routing, speed random from 4 to 7 tiles/sec
-  - `Insane`: 95% optimal routing, speed random from 7 to 10 tiles/sec
-  - `Demon`: 100% optimal routing, speed random from 10 to 14 tiles/sec
+- Difficulty selector with four CPU difficulty levels (single-player):
+  - `Normal`: 70% optimal routing, speed random from 1 to 2 tiles/sec
+  - `Hard`: 80% optimal routing, speed random from 3 to 5 tiles/sec
+  - `Insane`: 95% optimal routing, speed random from 5 to 7 tiles/sec
+  - `Demon`: 100% optimal routing, speed random from 7 to 10 tiles/sec
 - Difficulty is shown in HUD and can be changed before round start.
 - CPU movement is tile-by-tile, role-aware (chase/evade), and clamped to grid bounds.
 - Collision on same tile counts as tag/catch.
+- Game mode selector:
+  - `Single Player`: blue human vs red CPU
+  - `Local 1v1`: blue human vs red human on one keyboard
+- Local 1v1 controls:
+  - Blue player: `WASD`
+  - Red player: `Arrow Keys`
+- Both modes use the same 3-2-1 countdown and 60-second round timer.
+- Round outcomes are role-based:
+  - runner survives 60 seconds -> runner side wins
+  - chaser tags runner -> chaser side wins
 - Round result text:
   - `You survived`
   - `You were caught`
   - `You caught the CPU`
+  - `Runner side wins: survived 60 seconds`
+  - `Chaser side wins: runner was tagged`
   - `Time ran out`
 - Simple score display (`wins-losses`).
 - Game loop driven by `requestAnimationFrame` with modular state/update/render flow.
