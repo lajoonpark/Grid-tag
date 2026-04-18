@@ -55,7 +55,7 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
   - `You were caught`
   - `You caught the CPU`
   - `Runner side wins: survived 60 seconds`
-  - `Chaser side wins: runner was tagged`
+  - `Chaser team wins: all runners were tagged`
   - `Time ran out`
 - Simple score display (`runner wins - chaser wins`).
 - Active entity display (`active runners - active chasers`).
