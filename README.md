@@ -35,13 +35,21 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
 - Game mode selector:
   - `Single Player`: blue human vs red CPU
   - `Local 1v1`: blue human vs red human on one keyboard
+  - `Local 2v2`: two blue humans vs two red humans on one keyboard
+  - `Local 3v3`: three blue humans vs three red humans on one keyboard
 - Local 1v1 controls:
   - Blue player: `WASD`
   - Red player: `Arrow Keys`
+- Local 2v2 and 3v3 controls (shared-team local controls):
+  - Blue team: `WASD` (all blue teammates move together)
+  - Red team: `Arrow Keys` (all red teammates move together)
 - Both modes use the same 3-2-1 countdown and 60-second round timer.
 - Round outcomes are role-based:
   - runner survives 60 seconds -> runner side wins
   - chaser tags runner -> chaser side wins
+- Team round outcomes (1v1/2v2/3v3):
+  - runner team wins if at least one runner survives until timer ends
+  - chaser team wins if all runners are tagged before timer ends
 - Round result text:
   - `You survived`
   - `You were caught`
@@ -50,6 +58,7 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
   - `Chaser side wins: runner was tagged`
   - `Time ran out`
 - Simple score display (`runner wins - chaser wins`).
+- Active entity display (`active runners - active chasers`).
 - Game loop driven by `requestAnimationFrame` with modular state/update/render flow.
 
 ## Entity architecture (refactor for multi-unit modes)
@@ -87,4 +96,4 @@ The architecture is prepared for future modes by keeping mode definitions and en
 - 3v3
 - custom mode with arbitrary counts
 
-Current gameplay remains the same single-player experience (one human vs one CPU), while the internal systems now support scaling to multiple runners and chasers.
+Gameplay now includes single-player and local team modes while keeping the entity systems ready for custom scaling of runner/chaser counts.
