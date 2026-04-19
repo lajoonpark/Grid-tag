@@ -9,40 +9,44 @@
 <body>
   <main class="app-shell">
     <header class="hud" aria-label="Game HUD">
-      <div class="hud-item">
-        <span class="label">Roles</span>
-        <strong id="role-value">Blue: RUNNER | Red: CHASER</strong>
-      </div>
-      <div class="hud-item">
-        <span class="label">Round Timer</span>
-        <strong id="timer-value">60</strong>
-      </div>
-      <div class="hud-item">
-        <span class="label">Score (Runner-Chaser)</span>
-        <strong id="score-value">0-0</strong>
-      </div>
-      <div class="hud-item">
-        <span class="label">Active (Runners-Chasers)</span>
-        <strong id="active-counts-value">1-1</strong>
-      </div>
-      <div class="hud-item">
-        <span class="label">Countdown</span>
-        <strong id="countdown-value">-</strong>
-      </div>
-      <div class="hud-item">
-        <span class="label">Mode</span>
-        <strong id="mode-value">SINGLE PLAYER</strong>
-      </div>
-      <div class="hud-item">
-        <span class="label">Difficulty</span>
-        <strong id="difficulty-value">NORMAL</strong>
+      <div class="hud-stats">
+        <div class="hud-item">
+          <span class="label">Mode</span>
+          <strong id="mode-value">SINGLE PLAYER</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Role</span>
+          <strong id="role-value">Blue: RUNNER | Red: CHASER</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Difficulty</span>
+          <strong id="difficulty-value">NORMAL</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Timer</span>
+          <strong id="timer-value">60s</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Score (Runner-Chaser)</span>
+          <strong id="score-value">0-0</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Active (Runners-Chasers)</span>
+          <strong id="active-counts-value">1-1</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Countdown</span>
+          <strong id="countdown-value" class="countdown-pill">-</strong>
+        </div>
       </div>
       <div class="hud-controls">
         <button id="start-btn" type="button">Start Game</button>
-        <button id="role-runner-btn" type="button">Choose Role: Runner</button>
-        <button id="role-chaser-btn" type="button">Choose Role: Chaser</button>
+        <button id="pause-btn" type="button">Pause</button>
+        <button id="restart-round-btn" type="button">Restart Round</button>
+        <button id="role-runner-btn" type="button">Play as Runner</button>
+        <button id="role-chaser-btn" type="button">Play as Chaser</button>
         <label class="difficulty-picker" for="mode-select">
-          <span class="label">Game Mode</span>
+          <span class="label">Mode</span>
           <select id="mode-select">
             <option value="single-player">Single Player</option>
             <option value="1v1">Local 1v1</option>
@@ -100,15 +104,34 @@
       </section>
     </header>
 
+    <p id="mobile-warning" class="mobile-warning" role="status" hidden>
+      Mobile is not recommended: this game is tuned for keyboard controls and larger screens.
+    </p>
+
     <section class="status-panel" aria-label="Round status">
       <h2 id="result-value">Press Start Game</h2>
     </section>
 
     <section class="game-area" aria-label="Grid chase game area">
       <div id="grid" class="grid" role="grid" aria-label="30 by 30 game grid"></div>
+      <div id="round-overlay" class="round-overlay" hidden>
+        <div class="overlay-card">
+          <h3 id="overlay-title">Round Over</h3>
+          <p id="overlay-message"></p>
+          <div class="overlay-actions">
+            <button id="overlay-restart-btn" type="button">Play Again</button>
+            <button id="overlay-close-btn" type="button">Close</button>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <p id="instructions-value" class="instructions">Single Player: Blue (you) moves with WASD or Arrow Keys. Red CPU moves automatically.</p>
+    <section class="instructions-panel" aria-label="Instructions">
+      <h3>How to Play</h3>
+      <p id="instructions-value" class="instructions">
+        Single Player: Blue (you) moves with WASD or Arrow Keys. Red CPU moves automatically.
+      </p>
+    </section>
   </main>
 
   <script src="main.js"></script>

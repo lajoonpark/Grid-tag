@@ -1,13 +1,15 @@
 const CONFIG = {
   GRID_SIZE: 30,
   ROUND_MS: 60000,
-  COUNTDOWN_SECONDS: 3
+  COUNTDOWN_SECONDS: 3,
+  MIN_SPAWN_BUFFER: 4
 };
 
 const PHASE = {
   IDLE: 'idle',
   COUNTDOWN: 'countdown',
   PLAYING: 'playing',
+  PAUSED: 'paused',
   ENDED: 'ended'
 };
 
@@ -30,7 +32,6 @@ const DIFFICULTY = {
 
 const MODE = {
   SINGLE_PLAYER: 'single-player',
-  SPLIT_SCREEN: 'split-screen',
   ONE_VS_ONE: '1v1',
   TWO_VS_TWO: '2v2',
   THREE_VS_THREE: '3v3',
@@ -44,45 +45,6 @@ const DIFFICULTY_CONFIG = {
   [DIFFICULTY.HARD]: { label: 'HARD', optimalChance: 0.8, minSpeed: 3, maxSpeed: 5 },
   [DIFFICULTY.INSANE]: { label: 'INSANE', optimalChance: 0.95, minSpeed: 5, maxSpeed: 7 },
   [DIFFICULTY.DEMON]: { label: 'DEMON', optimalChance: 1, minSpeed: 7, maxSpeed: 10 }
-};
-
-const MODE_PRESETS = {
-  [MODE.SINGLE_PLAYER]: {
-    description: 'Current mode: one human vs one CPU',
-    sides: {
-      [SIDE.BLUE]: 1,
-      [SIDE.RED]: 1
-    }
-  },
-  [MODE.SPLIT_SCREEN]: {
-    description: 'Reserved for multiple human-controlled entities with independent cameras',
-    sides: {}
-  },
-  [MODE.ONE_VS_ONE]: {
-    description: 'Reserved for one entity per side',
-    sides: {
-      [SIDE.BLUE]: 1,
-      [SIDE.RED]: 1
-    }
-  },
-  [MODE.TWO_VS_TWO]: {
-    description: 'Reserved for two entities per side',
-    sides: {
-      [SIDE.BLUE]: 2,
-      [SIDE.RED]: 2
-    }
-  },
-  [MODE.THREE_VS_THREE]: {
-    description: 'Reserved for three entities per side',
-    sides: {
-      [SIDE.BLUE]: 3,
-      [SIDE.RED]: 3
-    }
-  },
-  [MODE.CUSTOM]: {
-    description: 'Reserved for arbitrary counts per side',
-    sides: {}
-  }
 };
 
 const CONTROL_MAPPINGS = {
@@ -199,7 +161,15 @@ const view = {
   countdownEl: document.getElementById('countdown-value'),
   resultEl: document.getElementById('result-value'),
   instructionsEl: document.getElementById('instructions-value'),
+  mobileWarningEl: document.getElementById('mobile-warning'),
+  roundOverlayEl: document.getElementById('round-overlay'),
+  overlayTitleEl: document.getElementById('overlay-title'),
+  overlayMessageEl: document.getElementById('overlay-message'),
   startBtn: document.getElementById('start-btn'),
+  pauseBtn: document.getElementById('pause-btn'),
+  restartRoundBtn: document.getElementById('restart-round-btn'),
+  overlayRestartBtn: document.getElementById('overlay-restart-btn'),
+  overlayCloseBtn: document.getElementById('overlay-close-btn'),
   roleRunnerBtn: document.getElementById('role-runner-btn'),
   roleChaserBtn: document.getElementById('role-chaser-btn'),
   modeSelect: document.getElementById('mode-select'),
@@ -225,6 +195,11 @@ const state = {
   remainingMs: CONFIG.ROUND_MS,
   countdownMs: CONFIG.COUNTDOWN_SECONDS * 1000,
   customSetup: getDefaultCustomSetup(),
+  overlayDismissed: false,
+  lastRound: {
+    resultText: '',
+    winningRole: null
+  },
   score: {
     runnerWins: 0,
     chaserWins: 0
@@ -232,6 +207,7 @@ const state = {
 };
 
 let lastFrameTime = 0;
+let feedbackTimeoutId = null;
 
 function toIndex(x, y) {
   return y * CONFIG.GRID_SIZE + x;
@@ -325,23 +301,26 @@ function createCpuEntity({ id, side, role, color, difficulty }) {
 }
 
 function getSpawnQueueForSide(side) {
+  const max = CONFIG.GRID_SIZE - 1;
   const points = [];
 
-  if (side === SIDE.BLUE) {
-    for (let y = 0; y < CONFIG.GRID_SIZE; y += 1) {
-      for (let x = 0; x < CONFIG.GRID_SIZE; x += 1) {
-        points.push({ x, y });
-      }
+  for (let y = 0; y < CONFIG.GRID_SIZE; y += 1) {
+    for (let x = 0; x < CONFIG.GRID_SIZE; x += 1) {
+      const ownCornerDistance = side === SIDE.BLUE ? x + y : max - x + (max - y);
+      const enemyCornerDistance = side === SIDE.BLUE ? max - x + (max - y) : x + y;
+      points.push({ x, y, ownCornerDistance, enemyCornerDistance });
     }
-    return points;
   }
 
-  for (let y = CONFIG.GRID_SIZE - 1; y >= 0; y -= 1) {
-    for (let x = CONFIG.GRID_SIZE - 1; x >= 0; x -= 1) {
-      points.push({ x, y });
+  // Keep entities near their own corner while biasing away from the enemy corner.
+  points.sort((a, b) => {
+    if (a.ownCornerDistance !== b.ownCornerDistance) {
+      return a.ownCornerDistance - b.ownCornerDistance;
     }
-  }
-  return points;
+    return b.enemyCornerDistance - a.enemyCornerDistance;
+  });
+
+  return points.map((point) => ({ x: point.x, y: point.y }));
 }
 
 function getPreferredSpawnPoints(side, count) {
@@ -368,13 +347,59 @@ function getPreferredSpawnPoints(side, count) {
   return cornerAnchors.slice(0, count).map(clampToGrid);
 }
 
+function hasOpposingSpawnBuffer(spawnPoint, side, occupiedBySide, minDistance) {
+  const opponentSide = side === SIDE.BLUE ? SIDE.RED : SIDE.BLUE;
+  const opponentSpawns = occupiedBySide.get(opponentSide) ?? [];
+
+  for (const opponent of opponentSpawns) {
+    if (CpuDecisionEngine.manhattanDistance(spawnPoint, opponent) < minDistance) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function findAvailableSpawnPoint({
+  pools,
+  side,
+  occupied,
+  occupiedBySide,
+  requireOpposingBuffer,
+  minOpposingDistance
+}) {
+  for (const pool of pools) {
+    for (const spawnPoint of pool) {
+      const positionKey = toIndex(spawnPoint.x, spawnPoint.y);
+      if (occupied.has(positionKey)) {
+        continue;
+      }
+
+      if (
+        requireOpposingBuffer &&
+        !hasOpposingSpawnBuffer(spawnPoint, side, occupiedBySide, minOpposingDistance)
+      ) {
+        continue;
+      }
+
+      return spawnPoint;
+    }
+  }
+
+  return null;
+}
+
 function spawnEntities(entities) {
   const sideQueues = new Map();
-  const sideQueueIndexes = new Map();
   const sidePreferred = new Map();
-  const sidePreferredIndexes = new Map();
   const sideCounts = new Map();
+  const occupiedBySide = new Map([
+    [SIDE.BLUE, []],
+    [SIDE.RED, []]
+  ]);
   const occupied = new Set();
+  // Try to keep early opposing spawns separated to reduce instant tags at round start.
+  const minOpposingDistance = Math.max(CONFIG.MIN_SPAWN_BUFFER, Math.floor(CONFIG.GRID_SIZE / 5));
 
   for (const entity of entities) {
     sideCounts.set(entity.side, (sideCounts.get(entity.side) ?? 0) + 1);
@@ -383,55 +408,41 @@ function spawnEntities(entities) {
   for (const entity of entities) {
     if (!sideQueues.has(entity.side)) {
       sideQueues.set(entity.side, getSpawnQueueForSide(entity.side));
-      sideQueueIndexes.set(entity.side, 0);
       sidePreferred.set(entity.side, getPreferredSpawnPoints(entity.side, sideCounts.get(entity.side) ?? 0));
-      sidePreferredIndexes.set(entity.side, 0);
     }
 
-    const preferredQueue = sidePreferred.get(entity.side);
-    let preferredIndex = sidePreferredIndexes.get(entity.side);
-    let assigned = false;
+    const preferredQueue = sidePreferred.get(entity.side) ?? [];
+    const queue = sideQueues.get(entity.side) ?? [];
+    const pools = [preferredQueue, queue];
 
-    while (preferredIndex < preferredQueue.length) {
-      const spawnPoint = preferredQueue[preferredIndex];
-      const positionKey = toIndex(spawnPoint.x, spawnPoint.y);
-      preferredIndex += 1;
+    let spawnPoint = findAvailableSpawnPoint({
+      pools,
+      side: entity.side,
+      occupied,
+      occupiedBySide,
+      requireOpposingBuffer: true,
+      minOpposingDistance
+    });
 
-      if (occupied.has(positionKey)) {
-        continue;
-      }
-
-      entity.x = spawnPoint.x;
-      entity.y = spawnPoint.y;
-      occupied.add(positionKey);
-      assigned = true;
-      break;
+    if (!spawnPoint) {
+      spawnPoint = findAvailableSpawnPoint({
+        pools,
+        side: entity.side,
+        occupied,
+        occupiedBySide,
+        requireOpposingBuffer: false,
+        minOpposingDistance
+      });
     }
 
-    sidePreferredIndexes.set(entity.side, preferredIndex);
-    if (assigned) {
+    if (!spawnPoint) {
       continue;
     }
 
-    const queue = sideQueues.get(entity.side);
-    let queueIndex = sideQueueIndexes.get(entity.side);
-
-    while (queueIndex < queue.length) {
-      const spawnPoint = queue[queueIndex];
-      const positionKey = toIndex(spawnPoint.x, spawnPoint.y);
-      queueIndex += 1;
-
-      if (occupied.has(positionKey)) {
-        continue;
-      }
-
-      entity.x = spawnPoint.x;
-      entity.y = spawnPoint.y;
-      occupied.add(positionKey);
-      break;
-    }
-
-    sideQueueIndexes.set(entity.side, queueIndex);
+    entity.x = spawnPoint.x;
+    entity.y = spawnPoint.y;
+    occupied.add(toIndex(spawnPoint.x, spawnPoint.y));
+    occupiedBySide.get(entity.side).push({ x: spawnPoint.x, y: spawnPoint.y });
   }
 }
 
@@ -719,15 +730,15 @@ function getDifficultyLabel() {
 
 function getInstructionsText() {
   if (state.mode === MODE.ONE_VS_ONE) {
-    return 'Local 1v1: Blue player uses WASD, Red player uses Arrow Keys.';
+    return 'Controls: Blue uses WASD, Red uses Arrow Keys. Rule: chasers win by tagging all runners before time runs out.';
   }
   if (state.mode === MODE.TWO_VS_TWO || state.mode === MODE.THREE_VS_THREE) {
-    return 'Local team mode: Blue team uses WASD (shared), Red team uses Arrow Keys (shared). All teammates move together.';
+    return 'Controls: Blue team uses WASD (shared), Red team uses Arrow Keys (shared). Rule: runners win if at least one survives.';
   }
   if (state.mode === MODE.CUSTOM) {
-    return 'Custom mode: all human-controlled entities move together with WASD or Arrow Keys.';
+    return 'Controls: all human-controlled entities move together with WASD or Arrow Keys. Use Pause/Restart to manage rounds quickly.';
   }
-  return 'Single Player: Blue (you) moves with WASD or Arrow Keys. Red CPU moves automatically.';
+  return 'Controls: move with WASD or Arrow Keys. Rule: survive as runner or tag as chaser before the 60-second timer ends.';
 }
 
 function countActiveByRole(entities) {
@@ -762,25 +773,85 @@ function setRoundResult(text) {
 }
 
 function getCountdownValue() {
-  return Math.max(1, Math.ceil(state.countdownMs / 1000));
+  return Math.max(0, Math.ceil(state.countdownMs / 1000));
+}
+
+function getTimerValue() {
+  return `${Math.ceil(state.remainingMs / 1000)}s`;
+}
+
+function isRoundInProgress() {
+  return state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN || state.phase === PHASE.PAUSED;
+}
+
+function didBlueSideWin(winningRole) {
+  return state.role === winningRole;
+}
+
+function triggerFeedback(className, durationMs = 420) {
+  document.body.classList.remove('feedback-tag', 'feedback-win', 'feedback-loss');
+  if (feedbackTimeoutId) {
+    clearTimeout(feedbackTimeoutId);
+  }
+  document.body.classList.add(className);
+  feedbackTimeoutId = setTimeout(() => {
+    document.body.classList.remove(className);
+    feedbackTimeoutId = null;
+  }, durationMs);
+}
+
+function getOverlayTitle() {
+  const { winningRole } = state.lastRound;
+  if (!winningRole) {
+    return 'Round Over';
+  }
+  if (isTeamOutcomeMode(state.mode)) {
+    return winningRole === ROLE.RUNNER ? 'Runner Side Wins' : 'Chaser Side Wins';
+  }
+  return didBlueSideWin(winningRole) ? 'You Win' : 'You Lose';
+}
+
+function renderOverlay() {
+  if (!view.roundOverlayEl) {
+    return;
+  }
+  const showOverlay = state.phase === PHASE.ENDED && !state.overlayDismissed;
+  view.roundOverlayEl.hidden = !showOverlay;
+  if (!showOverlay) {
+    return;
+  }
+  view.overlayTitleEl.textContent = getOverlayTitle();
+  view.overlayMessageEl.textContent = state.lastRound.resultText;
+}
+
+function renderMobileWarning() {
+  if (!view.mobileWarningEl) {
+    return;
+  }
+  const prefersTouch = window.matchMedia?.('(pointer: coarse)').matches;
+  const narrowScreen = window.innerWidth < 760;
+  view.mobileWarningEl.hidden = !(prefersTouch || narrowScreen);
 }
 
 function renderHUD() {
-  const isRoundActive = state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN;
+  const isRoundActive = isRoundInProgress();
   const activeCounts = countActiveByRole(state.entities);
   const isCustomMode = state.mode === MODE.CUSTOM;
   const customValidation = isCustomMode ? getCustomSetupValidation(state.customSetup) : { isValid: true };
   view.roleEl.textContent = getRolesLabel();
   view.modeEl.textContent = getModeLabel();
   view.difficultyEl.textContent = getDifficultyLabel();
-  view.timerEl.textContent = String(Math.ceil(state.remainingMs / 1000));
+  view.timerEl.textContent = getTimerValue();
   view.scoreEl.textContent = `${state.score.runnerWins}-${state.score.chaserWins}`;
   view.activeCountsEl.textContent = `${activeCounts.runners}-${activeCounts.chasers}`;
   view.roleRunnerBtn.disabled = isRoundActive || isCustomMode;
   view.roleChaserBtn.disabled = isRoundActive || isCustomMode;
   view.modeSelect.disabled = isRoundActive;
   view.difficultySelect.disabled = isRoundActive || state.mode !== MODE.SINGLE_PLAYER;
-  view.startBtn.disabled = isRoundActive || (isCustomMode && !customValidation.isValid);
+  view.startBtn.disabled = isRoundActive || (isCustomMode && !customValidation.isValid) || state.phase === PHASE.PAUSED;
+  view.pauseBtn.disabled = state.phase !== PHASE.PLAYING && state.phase !== PHASE.PAUSED;
+  view.pauseBtn.textContent = state.phase === PHASE.PAUSED ? 'Resume' : 'Pause';
+  view.restartRoundBtn.disabled = isCustomMode && !customValidation.isValid;
   view.customSetupPanel.hidden = !isCustomMode;
 
   if (view.customRunnersInput) {
@@ -795,8 +866,10 @@ function renderHUD() {
 
   if (state.phase === PHASE.COUNTDOWN) {
     view.countdownEl.textContent = String(getCountdownValue());
+    view.countdownEl.classList.add('active');
   } else {
     view.countdownEl.textContent = '-';
+    view.countdownEl.classList.remove('active');
   }
 }
 
@@ -844,17 +917,24 @@ function render() {
   renderEntities();
   renderInstructions();
   renderCustomSetup();
+  renderOverlay();
+  renderMobileWarning();
 }
 
 function endRound(resultText, winningRole) {
   state.phase = PHASE.ENDED;
+  state.overlayDismissed = false;
+  state.lastRound.resultText = resultText;
+  state.lastRound.winningRole = winningRole;
   if (winningRole === ROLE.RUNNER) {
     state.score.runnerWins += 1;
   } else {
     state.score.chaserWins += 1;
   }
   setRoundResult(resultText);
+  triggerFeedback(didBlueSideWin(winningRole) ? 'feedback-win' : 'feedback-loss', 650);
   renderHUD();
+  renderOverlay();
 }
 
 function findTagEvents(entities) {
@@ -906,6 +986,7 @@ function resolveCollision() {
     return;
   }
 
+  triggerFeedback('feedback-tag', 240);
   state.entities = removeTaggedRunners(state.entities, taggedRunnerIds);
 
   const activeCounts = countActiveByRole(state.entities);
@@ -1022,7 +1103,11 @@ function updateCpuMovement(deltaMs) {
   renderEntities();
 }
 
-function startRound() {
+function startRound(force = false) {
+  if (!force && (state.phase === PHASE.COUNTDOWN || state.phase === PHASE.PLAYING)) {
+    return;
+  }
+
   if (state.mode === MODE.CUSTOM) {
     const validation = getCustomSetupValidation(state.customSetup);
     if (!validation.isValid) {
@@ -1038,6 +1123,9 @@ function startRound() {
   state.remainingMs = CONFIG.ROUND_MS;
   state.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
   state.phase = PHASE.COUNTDOWN;
+  state.overlayDismissed = false;
+  state.lastRound.resultText = '';
+  state.lastRound.winningRole = null;
   if (state.mode === MODE.CUSTOM) {
     setRoundResult(`${getCustomSetupSummary(state.customSetup)} | Starting in ${CONFIG.COUNTDOWN_SECONDS}`);
   } else {
@@ -1046,10 +1134,30 @@ function startRound() {
   render();
 }
 
+function restartRound() {
+  startRound(true);
+}
+
+function togglePause() {
+  if (state.phase === PHASE.PLAYING) {
+    state.phase = PHASE.PAUSED;
+    setRoundResult('Paused');
+    renderHUD();
+    return;
+  }
+  if (state.phase === PHASE.PAUSED) {
+    state.phase = PHASE.PLAYING;
+    setRoundResult('Round in progress');
+    renderHUD();
+  }
+}
+
 function updateCountdown(deltaMs) {
   state.countdownMs = Math.max(0, state.countdownMs - deltaMs);
-  setRoundResult(`Starting in ${getCountdownValue()}`);
-  if (state.countdownMs <= 0) {
+  const seconds = getCountdownValue();
+  if (seconds > 0) {
+    setRoundResult(`Starting in ${seconds}`);
+  } else {
     state.phase = PHASE.PLAYING;
     setRoundResult('Round in progress');
   }
@@ -1119,7 +1227,7 @@ function onKeydown(event) {
 }
 
 function setRole(role) {
-  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
+  if (isRoundInProgress()) {
     return;
   }
   if (state.mode === MODE.CUSTOM) {
@@ -1132,7 +1240,7 @@ function setRole(role) {
 }
 
 function setDifficulty(difficulty) {
-  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
+  if (isRoundInProgress()) {
     return;
   }
   if (!DIFFICULTY_CONFIG[difficulty]) {
@@ -1144,7 +1252,7 @@ function setDifficulty(difficulty) {
 }
 
 function setMode(mode) {
-  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
+  if (isRoundInProgress()) {
     return;
   }
   if (
@@ -1157,6 +1265,7 @@ function setMode(mode) {
     return;
   }
   state.mode = mode;
+  state.overlayDismissed = true;
 
   if (mode === MODE.CUSTOM) {
     state.role = state.customSetup.humanRole;
@@ -1179,7 +1288,7 @@ function setMode(mode) {
 }
 
 function setCustomSetup(nextSetup) {
-  if (state.phase === PHASE.PLAYING || state.phase === PHASE.COUNTDOWN) {
+  if (isRoundInProgress()) {
     return;
   }
 
@@ -1208,6 +1317,11 @@ function onCustomSetupInputChange() {
   setCustomSetup(readCustomSetupFromInputs());
 }
 
+function closeOverlay() {
+  state.overlayDismissed = true;
+  renderOverlay();
+}
+
 function init() {
   buildGrid();
 
@@ -1226,6 +1340,10 @@ function init() {
   document.addEventListener('keydown', onKeydown);
 
   view.startBtn.addEventListener('click', startRound);
+  view.pauseBtn.addEventListener('click', togglePause);
+  view.restartRoundBtn.addEventListener('click', restartRound);
+  view.overlayRestartBtn.addEventListener('click', restartRound);
+  view.overlayCloseBtn.addEventListener('click', closeOverlay);
   view.roleRunnerBtn.addEventListener('click', () => setRole(ROLE.RUNNER));
   view.roleChaserBtn.addEventListener('click', () => setRole(ROLE.CHASER));
   view.modeSelect.addEventListener('change', (event) => setMode(event.target.value));
@@ -1236,6 +1354,7 @@ function init() {
   view.customHumanCountInput.addEventListener('input', onCustomSetupInputChange);
   view.customCpuCountInput.addEventListener('input', onCustomSetupInputChange);
   view.customDifficultySelect.addEventListener('change', onCustomSetupInputChange);
+  window.addEventListener('resize', renderMobileWarning);
 
   requestAnimationFrame(gameLoop);
 }
