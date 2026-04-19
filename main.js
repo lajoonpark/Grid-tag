@@ -311,6 +311,7 @@ function getSpawnQueueForSide(side) {
     }
   }
 
+  // Keep entities near their own corner while biasing away from the enemy corner.
   points.sort((a, b) => {
     if (a.ownCornerDistance !== b.ownCornerDistance) {
       return a.ownCornerDistance - b.ownCornerDistance;
@@ -396,6 +397,7 @@ function spawnEntities(entities) {
     [SIDE.RED, []]
   ]);
   const occupied = new Set();
+  // Try to keep early opposing spawns separated to reduce instant tags at round start.
   const minOpposingDistance = Math.max(4, Math.floor(CONFIG.GRID_SIZE / 5));
 
   for (const entity of entities) {

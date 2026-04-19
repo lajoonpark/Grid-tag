@@ -1,109 +1,89 @@
 # Grid-tag
 
-First playable browser-based grid tag game built with plain HTML, CSS, and JavaScript.
+Browser-based grid tag game built with plain HTML, CSS, and JavaScript (no frameworks).
 
-## How to run locally
+## How to run
 
-1. Open the repository folder.
-2. Launch `index.html` in any modern browser.
-   - Example using Python:
+1. Open this repository folder.
+2. Start a local server or open `index.html` directly.
+   - Example:
      - `python -m http.server 8080`
      - Open `http://localhost:8080`
 
-## Implemented features (first playable version)
+## Game modes
 
-- 30x30 visible square-cell grid.
-- Single-player round with one human (blue) and one CPU (red).
-- Role selection buttons:
-  - Choose Role: Runner
-  - Choose Role: Chaser
-- Start Game button with visible `3, 2, 1` countdown before movement starts.
-- Human movement:
-  - Arrow keys + WASD
-  - one key press = one tile move
-  - movement clamped to grid bounds
-- Opposite-corner spawning each round.
-- Round timer (60 seconds) and top HUD role display (`RUNNER`/`CHASER`).
-- Difficulty selector with four CPU difficulty levels (single-player):
-  - `Normal`: 70% optimal routing, speed random from 1 to 2 tiles/sec
-  - `Hard`: 80% optimal routing, speed random from 3 to 5 tiles/sec
-  - `Insane`: 95% optimal routing, speed random from 5 to 7 tiles/sec
-  - `Demon`: 100% optimal routing, speed random from 7 to 10 tiles/sec
-- Difficulty is shown in HUD and can be changed before round start.
-- CPU movement is tile-by-tile, role-aware (chase/evade), and clamped to grid bounds.
-- Collision on same tile counts as tag/catch.
-- Game mode selector:
-  - `Single Player`: blue human vs red CPU
-  - `Local 1v1`: blue human vs red human on one keyboard
-  - `Local 2v2`: two blue humans vs two red humans on one keyboard
-  - `Local 3v3`: three blue humans vs three red humans on one keyboard
-  - `Custom`: configurable runners/chasers with mixed human/CPU counts
-- Local 1v1 controls:
-  - Blue player: `WASD`
-  - Red player: `Arrow Keys`
-- Local 2v2 and 3v3 controls (shared-team local controls):
+- **Single Player**
+  - Blue side is human-controlled.
+  - Red side is CPU-controlled.
+  - Choose your role (`Runner` or `Chaser`) and CPU difficulty.
+- **Local 1v1**
+  - Blue side and Red side are both human-controlled on one keyboard.
+- **Local 2v2**
+  - Two blue entities vs two red entities.
+  - Shared team controls per side.
+- **Local 3v3**
+  - Three blue entities vs three red entities.
+  - Shared team controls per side.
+- **Custom**
+  - Configure runner/chaser counts.
+  - Configure human role, human count, CPU count, and CPU difficulty.
+  - Validation prevents invalid setups.
+
+## Controls
+
+### Round controls
+
+- **Start Game**: begin a new round with countdown.
+- **Pause / Resume**: pause or resume active round.
+- **Restart Round**: restart current mode/setup immediately.
+
+### Movement controls
+
+- **Single Player**
+  - Human side: `WASD` or `Arrow Keys`
+- **Local 1v1**
+  - Blue side: `WASD`
+  - Red side: `Arrow Keys`
+- **Local 2v2 / 3v3**
   - Blue team: `WASD` (all blue teammates move together)
   - Red team: `Arrow Keys` (all red teammates move together)
-- Both modes use the same 3-2-1 countdown and 60-second round timer.
-- Round outcomes are role-based:
-  - runner survives 60 seconds -> runner side wins
-  - chaser tags runner -> chaser side wins
-- Team round outcomes (1v1/2v2/3v3):
-  - runner team wins if at least one runner survives until timer ends
-  - chaser team wins if all runners are tagged before timer ends
-- Custom mode setup supports:
-  - number of runners
-  - number of chasers
-  - human role (`runner` or `chaser`)
-  - number of human-controlled entities
-  - number of CPU-controlled entities
-  - CPU difficulty (`Normal`, `Hard`, `Insane`, `Demon`)
-- Custom mode validation prevents invalid setups (for example mismatched totals or too many humans for the selected human role).
-- Custom mode summary is shown before round start.
-- Round result text:
-  - `You survived`
-  - `You were caught`
-  - `You caught the CPU`
-  - `Runner side wins: survived 60 seconds`
-  - `Chaser side wins: all runners were tagged`
-  - `Time ran out`
-- Simple score display (`runner wins - chaser wins`).
-- Active entity display (`active runners - active chasers`).
-- Game loop driven by `requestAnimationFrame` with modular state/update/render flow.
+- **Custom**
+  - Human-controlled entities move together with `WASD` or `Arrow Keys`
 
-## Entity architecture (refactor for multi-unit modes)
+## Rules
 
-The game now uses an entity-based model instead of fixed `human`/`cpu` position variables.
+- Grid size is **30x30**.
+- Each round has a **3-second countdown** and a **60-second timer**.
+- Roles:
+  - **Runner**: survive until timer reaches 0.
+  - **Chaser**: tag opposing runner(s) before timer ends.
+- A tag happens when runner and chaser occupy the same tile.
+- Team outcomes:
+  - **Runners win** if at least one runner survives to timeout.
+  - **Chasers win** if all opposing runners are tagged.
+- Score tracks total round wins by role:
+  - `Runner wins - Chaser wins`
 
-Each entity stores:
+## UX and HUD highlights
 
-- `id`
-- `side` (team/side)
-- `role` (`runner` or `chaser`)
-- `color`
-- `x`, `y` position
-- `isHuman` / `isCPU`
-- `controlMapping` (when human-controlled)
-- `cpuSettings` (when CPU-controlled)
+- Clear HUD labels for **Mode**, **Role**, **Difficulty**, **Timer**, **Score**, **Active counts**, and **Countdown**.
+- Countdown is visually emphasized.
+- End-of-round overlay provides clear result feedback and quick replay action.
+- Visual feedback flashes on tag / win / loss.
+- Mobile warning appears on touch/narrow devices because keyboard play is preferred.
 
-Core systems in `main.js` are organized around that entity shape:
+## Known limitations
 
-- **Entity creation**: `createEntity`, `createHumanEntity`, `createCpuEntity`
-- **Spawning**: `spawnEntities`, `getSpawnQueueForSide`
-- **Movement**: `moveEntity`, `moveHumanByKey`, `updateCpuMovement`, `moveCpuEntity`
-- **Collision / tag resolution**: `findTagEvents`, `resolveCollision`
-- **Rendering**: `renderEntities`
+- No online multiplayer.
+- Single keyboard local play means key rollover/ghosting can vary by hardware.
+- Shared controls in team modes move all same-side teammates together (not per-entity controls).
+- No sound effects yet.
+- No obstacle tiles or map variations yet.
 
-`state.entities` is now the single source of truth for all player/CPU units.
+## Future improvement ideas
 
-## Future mode readiness
-
-The architecture is prepared for future modes by keeping mode definitions and entity systems mode-agnostic:
-
-- split-screen multiplayer
-- 1v1
-- 2v2
-- 3v3
-- custom mode with arbitrary counts
-
-Gameplay now includes single-player and local team modes while keeping the entity systems ready for custom scaling of runner/chaser counts.
+- Optional per-entity controls in team/custom modes.
+- Online multiplayer or LAN play.
+- Additional map types (obstacles, zones, power-ups).
+- Accessibility options (high contrast presets, remappable keys).
+- Audio cues and richer round-end animations.
