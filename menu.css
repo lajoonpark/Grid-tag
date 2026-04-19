@@ -222,7 +222,7 @@ body {
 .sub-panel {
   position: absolute;
   top: 0;
-  left: calc(100% + 0.9rem);
+  left: calc(100% + 0.38rem);
 
   background: #4a6cf7;
   border-radius: 20px;
@@ -238,6 +238,15 @@ body {
   pointer-events: none;
   transform: translateX(-12px);
   transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.sub-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.45rem;
+  width: 0.45rem;
 }
 
 /* CSS :has() – show CPU sub-panel */

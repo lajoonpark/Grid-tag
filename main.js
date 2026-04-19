@@ -13,6 +13,11 @@ const PHASE = {
   ENDED: 'ended'
 };
 
+const SCREEN = {
+  CONFIG: 'config',
+  GAMEPLAY: 'gameplay'
+};
+
 const ROLE = {
   RUNNER: 'runner',
   CHASER: 'chaser'
@@ -151,6 +156,10 @@ class CpuDecisionEngine {
 const cpuDecisionEngine = new CpuDecisionEngine(CONFIG.GRID_SIZE, DIFFICULTY_CONFIG);
 
 const view = {
+  configViewEl: document.getElementById('config-view'),
+  gameplayViewEl: document.getElementById('gameplay-view'),
+  countdownScreenEl: document.getElementById('countdown-screen'),
+  countdownScreenValueEl: document.getElementById('countdown-screen-value'),
   gridEl: document.getElementById('grid'),
   roleEl: document.getElementById('role-value'),
   modeEl: document.getElementById('mode-value'),
@@ -158,21 +167,20 @@ const view = {
   timerEl: document.getElementById('timer-value'),
   scoreEl: document.getElementById('score-value'),
   activeCountsEl: document.getElementById('active-counts-value'),
-  countdownEl: document.getElementById('countdown-value'),
   resultEl: document.getElementById('result-value'),
-  instructionsEl: document.getElementById('instructions-value'),
-  mobileWarningEl: document.getElementById('mobile-warning'),
   roundOverlayEl: document.getElementById('round-overlay'),
   overlayTitleEl: document.getElementById('overlay-title'),
   overlayMessageEl: document.getElementById('overlay-message'),
   startBtn: document.getElementById('start-btn'),
   pauseBtn: document.getElementById('pause-btn'),
+  continueBtn: document.getElementById('continue-btn'),
   restartRoundBtn: document.getElementById('restart-round-btn'),
+  backConfigBtn: document.getElementById('back-config-btn'),
+  overlayConfigBtn: document.getElementById('overlay-config-btn'),
   overlayRestartBtn: document.getElementById('overlay-restart-btn'),
   overlayCloseBtn: document.getElementById('overlay-close-btn'),
-  roleRunnerBtn: document.getElementById('role-runner-btn'),
-  roleChaserBtn: document.getElementById('role-chaser-btn'),
-  modeSelect: document.getElementById('mode-select'),
+  roleToggleBtn: document.getElementById('role-toggle-btn'),
+  settingsMenuWrapEl: document.getElementById('settings-menu-wrap'),
   difficultySelect: document.getElementById('difficulty-select'),
   customSetupPanel: document.getElementById('custom-setup-panel'),
   customRunnersInput: document.getElementById('custom-runners-input'),
@@ -187,6 +195,7 @@ const view = {
 };
 
 const state = {
+  screen: SCREEN.CONFIG,
   phase: PHASE.IDLE,
   role: ROLE.RUNNER,
   difficulty: DIFFICULTY.NORMAL,
@@ -825,34 +834,59 @@ function renderOverlay() {
 }
 
 function renderMobileWarning() {
-  if (!view.mobileWarningEl) {
-    return;
-  }
-  const prefersTouch = window.matchMedia?.('(pointer: coarse)').matches;
-  const narrowScreen = window.innerWidth < 760;
-  view.mobileWarningEl.hidden = !(prefersTouch || narrowScreen);
+  // Removed from redesigned UI.
 }
 
 function renderHUD() {
   const isRoundActive = isRoundInProgress();
   const activeCounts = countActiveByRole(state.entities);
   const isCustomMode = state.mode === MODE.CUSTOM;
+  const isCpuMode = state.mode === MODE.SINGLE_PLAYER;
   const customValidation = isCustomMode ? getCustomSetupValidation(state.customSetup) : { isValid: true };
-  view.roleEl.textContent = getRolesLabel();
-  view.modeEl.textContent = getModeLabel();
-  view.difficultyEl.textContent = getDifficultyLabel();
-  view.timerEl.textContent = getTimerValue();
-  view.scoreEl.textContent = `${state.score.runnerWins}-${state.score.chaserWins}`;
-  view.activeCountsEl.textContent = `${activeCounts.runners}-${activeCounts.chasers}`;
-  view.roleRunnerBtn.disabled = isRoundActive || isCustomMode;
-  view.roleChaserBtn.disabled = isRoundActive || isCustomMode;
-  view.modeSelect.disabled = isRoundActive;
-  view.difficultySelect.disabled = isRoundActive || state.mode !== MODE.SINGLE_PLAYER;
-  view.startBtn.disabled = isRoundActive || (isCustomMode && !customValidation.isValid) || state.phase === PHASE.PAUSED;
-  view.pauseBtn.disabled = state.phase !== PHASE.PLAYING && state.phase !== PHASE.PAUSED;
-  view.pauseBtn.textContent = state.phase === PHASE.PAUSED ? 'Resume' : 'Pause';
-  view.restartRoundBtn.disabled = isCustomMode && !customValidation.isValid;
-  view.customSetupPanel.hidden = !isCustomMode;
+  if (view.roleEl) {
+    view.roleEl.textContent = getRolesLabel();
+  }
+  if (view.modeEl) {
+    view.modeEl.textContent = getModeLabel();
+  }
+  if (view.difficultyEl) {
+    view.difficultyEl.textContent = getDifficultyLabel();
+  }
+  if (view.timerEl) {
+    view.timerEl.textContent = getTimerValue();
+  }
+  if (view.scoreEl) {
+    view.scoreEl.textContent = `${state.score.runnerWins}-${state.score.chaserWins}`;
+  }
+  if (view.activeCountsEl) {
+    view.activeCountsEl.textContent = `${activeCounts.runners}-${activeCounts.chasers}`;
+  }
+  if (view.settingsMenuWrapEl) {
+    view.settingsMenuWrapEl.hidden = !isCpuMode;
+  }
+  if (view.roleToggleBtn) {
+    view.roleToggleBtn.textContent =
+      state.role === ROLE.RUNNER ? 'Play as Chaser' : 'Play as Runner';
+    view.roleToggleBtn.disabled = isRoundActive || isCustomMode;
+  }
+  if (view.difficultySelect) {
+    view.difficultySelect.disabled = isRoundActive || !isCpuMode;
+  }
+  if (view.startBtn) {
+    view.startBtn.disabled = isRoundActive || (isCustomMode && !customValidation.isValid) || state.phase === PHASE.PAUSED;
+  }
+  if (view.pauseBtn) {
+    view.pauseBtn.disabled = state.phase !== PHASE.PLAYING;
+  }
+  if (view.continueBtn) {
+    view.continueBtn.disabled = state.phase !== PHASE.PAUSED;
+  }
+  if (view.restartRoundBtn) {
+    view.restartRoundBtn.disabled = isCustomMode && !customValidation.isValid;
+  }
+  if (view.customSetupPanel) {
+    view.customSetupPanel.hidden = !isCustomMode;
+  }
 
   if (view.customRunnersInput) {
     const shouldDisableCustomFields = isRoundActive || !isCustomMode;
@@ -864,17 +898,30 @@ function renderHUD() {
     view.customDifficultySelect.disabled = shouldDisableCustomFields;
   }
 
-  if (state.phase === PHASE.COUNTDOWN) {
-    view.countdownEl.textContent = String(getCountdownValue());
-    view.countdownEl.classList.add('active');
-  } else {
-    view.countdownEl.textContent = '-';
-    view.countdownEl.classList.remove('active');
+  if (view.countdownScreenEl && view.countdownScreenValueEl) {
+    const showCountdown = state.screen === SCREEN.GAMEPLAY && state.phase === PHASE.COUNTDOWN;
+    view.countdownScreenEl.hidden = !showCountdown;
+    if (showCountdown) {
+      if (state.countdownMs > 0) {
+        view.countdownScreenValueEl.textContent = String(Math.max(1, Math.ceil(state.countdownMs / 1000)));
+      } else {
+        view.countdownScreenValueEl.textContent = 'START!';
+      }
+    }
   }
 }
 
 function renderInstructions() {
-  view.instructionsEl.textContent = getInstructionsText();
+  // Removed from redesigned UI.
+}
+
+function renderScreen() {
+  if (view.configViewEl) {
+    view.configViewEl.hidden = state.screen !== SCREEN.CONFIG;
+  }
+  if (view.gameplayViewEl) {
+    view.gameplayViewEl.hidden = state.screen !== SCREEN.GAMEPLAY;
+  }
 }
 
 function renderCustomSetup() {
@@ -913,9 +960,9 @@ function renderEntities() {
 }
 
 function render() {
+  renderScreen();
   renderHUD();
   renderEntities();
-  renderInstructions();
   renderCustomSetup();
   renderOverlay();
   renderMobileWarning();
@@ -1123,6 +1170,7 @@ function startRound(force = false) {
   state.remainingMs = CONFIG.ROUND_MS;
   state.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
   state.phase = PHASE.COUNTDOWN;
+  state.screen = SCREEN.GAMEPLAY;
   state.overlayDismissed = false;
   state.lastRound.resultText = '';
   state.lastRound.winningRole = null;
@@ -1138,13 +1186,15 @@ function restartRound() {
   startRound(true);
 }
 
-function togglePause() {
+function pauseRound() {
   if (state.phase === PHASE.PLAYING) {
     state.phase = PHASE.PAUSED;
     setRoundResult('Paused');
     renderHUD();
-    return;
   }
+}
+
+function continueRound() {
   if (state.phase === PHASE.PAUSED) {
     state.phase = PHASE.PLAYING;
     setRoundResult('Round in progress');
@@ -1152,14 +1202,29 @@ function togglePause() {
   }
 }
 
+function goToConfigurations() {
+  state.screen = SCREEN.CONFIG;
+  state.phase = PHASE.IDLE;
+  state.countdownMs = CONFIG.COUNTDOWN_SECONDS * 1000;
+  state.remainingMs = CONFIG.ROUND_MS;
+  state.overlayDismissed = true;
+  state.lastRound.resultText = '';
+  state.lastRound.winningRole = null;
+  setRoundResult('Press Start');
+  render();
+}
+
 function updateCountdown(deltaMs) {
-  state.countdownMs = Math.max(0, state.countdownMs - deltaMs);
-  const seconds = getCountdownValue();
-  if (seconds > 0) {
+  state.countdownMs -= deltaMs;
+  if (state.countdownMs > 0) {
+    const seconds = Math.ceil(state.countdownMs / 1000);
     setRoundResult(`Starting in ${seconds}`);
   } else {
-    state.phase = PHASE.PLAYING;
-    setRoundResult('Round in progress');
+    setRoundResult('START!');
+    if (state.countdownMs <= -650) {
+      state.phase = PHASE.PLAYING;
+      setRoundResult('Round in progress');
+    }
   }
 }
 
@@ -1369,15 +1434,18 @@ function init() {
 
   buildGrid();
 
-  // Sync selects and custom inputs to the (possibly updated) state
-  view.modeSelect.value = state.mode;
-  view.difficultySelect.value = state.difficulty;
-  view.customRunnersInput.value = String(state.customSetup.runners);
-  view.customChasersInput.value = String(state.customSetup.chasers);
-  view.customHumanRoleSelect.value = state.customSetup.humanRole;
-  view.customHumanCountInput.value = String(state.customSetup.humanCount);
-  view.customCpuCountInput.value = String(state.customSetup.cpuCount);
-  view.customDifficultySelect.value = state.customSetup.cpuDifficulty;
+  // Sync controls and custom inputs to the (possibly updated) state
+  if (view.difficultySelect) {
+    view.difficultySelect.value = state.difficulty;
+  }
+  if (view.customRunnersInput) {
+    view.customRunnersInput.value = String(state.customSetup.runners);
+    view.customChasersInput.value = String(state.customSetup.chasers);
+    view.customHumanRoleSelect.value = state.customSetup.humanRole;
+    view.customHumanCountInput.value = String(state.customSetup.humanCount);
+    view.customCpuCountInput.value = String(state.customSetup.cpuCount);
+    view.customDifficultySelect.value = state.customSetup.cpuDifficulty;
+  }
 
   // See README "Entity architecture" for the full organization and system breakdown.
   state.entities = createEntitiesForCurrentMode();
@@ -1386,21 +1454,46 @@ function init() {
 
   document.addEventListener('keydown', onKeydown);
 
-  view.startBtn.addEventListener('click', startRound);
-  view.pauseBtn.addEventListener('click', togglePause);
-  view.restartRoundBtn.addEventListener('click', restartRound);
-  view.overlayRestartBtn.addEventListener('click', restartRound);
-  view.overlayCloseBtn.addEventListener('click', closeOverlay);
-  view.roleRunnerBtn.addEventListener('click', () => setRole(ROLE.RUNNER));
-  view.roleChaserBtn.addEventListener('click', () => setRole(ROLE.CHASER));
-  view.modeSelect.addEventListener('change', (event) => setMode(event.target.value));
-  view.difficultySelect.addEventListener('change', (event) => setDifficulty(event.target.value));
-  view.customRunnersInput.addEventListener('input', onCustomSetupInputChange);
-  view.customChasersInput.addEventListener('input', onCustomSetupInputChange);
-  view.customHumanRoleSelect.addEventListener('change', onCustomSetupInputChange);
-  view.customHumanCountInput.addEventListener('input', onCustomSetupInputChange);
-  view.customCpuCountInput.addEventListener('input', onCustomSetupInputChange);
-  view.customDifficultySelect.addEventListener('change', onCustomSetupInputChange);
+  if (view.startBtn) {
+    view.startBtn.addEventListener('click', startRound);
+  }
+  if (view.pauseBtn) {
+    view.pauseBtn.addEventListener('click', pauseRound);
+  }
+  if (view.continueBtn) {
+    view.continueBtn.addEventListener('click', continueRound);
+  }
+  if (view.restartRoundBtn) {
+    view.restartRoundBtn.addEventListener('click', restartRound);
+  }
+  if (view.backConfigBtn) {
+    view.backConfigBtn.addEventListener('click', goToConfigurations);
+  }
+  if (view.overlayConfigBtn) {
+    view.overlayConfigBtn.addEventListener('click', goToConfigurations);
+  }
+  if (view.overlayRestartBtn) {
+    view.overlayRestartBtn.addEventListener('click', restartRound);
+  }
+  if (view.overlayCloseBtn) {
+    view.overlayCloseBtn.addEventListener('click', closeOverlay);
+  }
+  if (view.roleToggleBtn) {
+    view.roleToggleBtn.addEventListener('click', () =>
+      setRole(state.role === ROLE.RUNNER ? ROLE.CHASER : ROLE.RUNNER)
+    );
+  }
+  if (view.difficultySelect) {
+    view.difficultySelect.addEventListener('change', (event) => setDifficulty(event.target.value));
+  }
+  if (view.customRunnersInput) {
+    view.customRunnersInput.addEventListener('input', onCustomSetupInputChange);
+    view.customChasersInput.addEventListener('input', onCustomSetupInputChange);
+    view.customHumanRoleSelect.addEventListener('change', onCustomSetupInputChange);
+    view.customHumanCountInput.addEventListener('input', onCustomSetupInputChange);
+    view.customCpuCountInput.addEventListener('input', onCustomSetupInputChange);
+    view.customDifficultySelect.addEventListener('change', onCustomSetupInputChange);
+  }
   window.addEventListener('resize', renderMobileWarning);
 
   requestAnimationFrame(gameLoop);
