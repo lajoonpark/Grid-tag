@@ -2,6 +2,8 @@ const CONFIG = {
   GRID_SIZE: 30,
   ROUND_MS: 60000,
   COUNTDOWN_SECONDS: 3,
+  COUNTDOWN_START_DELAY_MS: 650,
+  MIN_COUNTDOWN_DISPLAY: 1,
   MIN_SPAWN_BUFFER: 4
 };
 
@@ -177,6 +179,9 @@ const view = {
   restartRoundBtn: document.getElementById('restart-round-btn'),
   backConfigBtn: document.getElementById('back-config-btn'),
   overlayConfigBtn: document.getElementById('overlay-config-btn'),
+  configMenuBtn: document.getElementById('config-menu-btn'),
+  menuBtn: document.getElementById('menu-btn'),
+  overlayMenuBtn: document.getElementById('overlay-menu-btn'),
   overlayRestartBtn: document.getElementById('overlay-restart-btn'),
   overlayCloseBtn: document.getElementById('overlay-close-btn'),
   roleToggleBtn: document.getElementById('role-toggle-btn'),
@@ -785,6 +790,10 @@ function getCountdownValue() {
   return Math.max(0, Math.ceil(state.countdownMs / 1000));
 }
 
+function getCountdownDisplaySeconds() {
+  return Math.max(CONFIG.MIN_COUNTDOWN_DISPLAY, Math.ceil(state.countdownMs / 1000));
+}
+
 function getTimerValue() {
   return `${Math.ceil(state.remainingMs / 1000)}s`;
 }
@@ -903,7 +912,7 @@ function renderHUD() {
     view.countdownScreenEl.hidden = !showCountdown;
     if (showCountdown) {
       if (state.countdownMs > 0) {
-        view.countdownScreenValueEl.textContent = String(Math.max(1, Math.ceil(state.countdownMs / 1000)));
+        view.countdownScreenValueEl.textContent = String(getCountdownDisplaySeconds());
       } else {
         view.countdownScreenValueEl.textContent = 'START!';
       }
@@ -1215,13 +1224,14 @@ function goToConfigurations() {
 }
 
 function updateCountdown(deltaMs) {
-  state.countdownMs -= deltaMs;
+  const startThresholdMs = -CONFIG.COUNTDOWN_START_DELAY_MS;
+  state.countdownMs = Math.max(startThresholdMs, state.countdownMs - deltaMs);
   if (state.countdownMs > 0) {
-    const seconds = Math.ceil(state.countdownMs / 1000);
-    setRoundResult(`Starting in ${seconds}`);
+    setRoundResult(`Starting in ${getCountdownDisplaySeconds()}`);
   } else {
     setRoundResult('START!');
-    if (state.countdownMs <= -650) {
+    // Keep START! briefly visible before transitioning into active gameplay.
+    if (state.countdownMs <= startThresholdMs) {
       state.phase = PHASE.PLAYING;
       setRoundResult('Round in progress');
     }
@@ -1471,6 +1481,21 @@ function init() {
   }
   if (view.overlayConfigBtn) {
     view.overlayConfigBtn.addEventListener('click', goToConfigurations);
+  }
+  if (view.configMenuBtn) {
+    view.configMenuBtn.addEventListener('click', () => {
+      location.href = 'index.html';
+    });
+  }
+  if (view.menuBtn) {
+    view.menuBtn.addEventListener('click', () => {
+      location.href = 'index.html';
+    });
+  }
+  if (view.overlayMenuBtn) {
+    view.overlayMenuBtn.addEventListener('click', () => {
+      location.href = 'index.html';
+    });
   }
   if (view.overlayRestartBtn) {
     view.overlayRestartBtn.addEventListener('click', restartRound);
