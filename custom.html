@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grid Tag &ndash; Custom Game</title>
+  <link rel="stylesheet" href="menu.css" />
+</head>
+<body>
+  <div class="page-shell">
+
+    <nav class="page-nav">
+      <a class="page-logo" href="index.html">
+        <span class="logo-grid">GRID</span>&nbsp;<span class="logo-tag">TAG</span>
+      </a>
+      <a class="back-btn" href="index.html">&#8592; Back to Menu</a>
+    </nav>
+
+    <h1 class="page-title">Custom Game</h1>
+    <p class="page-subtitle">Configure your match, then hit Play.</p>
+
+    <div class="custom-card">
+
+      <div class="custom-field">
+        <label for="c-runners">Runners</label>
+        <input id="c-runners" type="number" min="1" max="449" value="2" />
+      </div>
+
+      <div class="custom-field">
+        <label for="c-chasers">Chasers</label>
+        <input id="c-chasers" type="number" min="1" max="449" value="2" />
+      </div>
+
+      <div class="custom-field">
+        <label for="c-human-role">Your Role</label>
+        <select id="c-human-role">
+          <option value="runner">Runner</option>
+          <option value="chaser">Chaser</option>
+        </select>
+      </div>
+
+      <div class="custom-field">
+        <label for="c-human-count">Human Players</label>
+        <input id="c-human-count" type="number" min="1" value="1" />
+      </div>
+
+      <div class="custom-field">
+        <label for="c-cpu-count">CPU Players</label>
+        <input id="c-cpu-count" type="number" min="0" value="3" />
+      </div>
+
+      <div class="custom-field">
+        <label for="c-difficulty">CPU Difficulty</label>
+        <select id="c-difficulty">
+          <option value="normal">Normal</option>
+          <option value="hard">Hard</option>
+          <option value="insane">Insane</option>
+          <option value="demon">Demon</option>
+        </select>
+      </div>
+
+      <p id="c-validation" class="custom-validation" role="status" aria-live="polite"></p>
+      <p id="c-summary"    class="custom-summary"></p>
+
+    </div>
+
+    <div class="custom-actions">
+      <button id="c-play-btn" class="custom-play-btn" type="button">Play</button>
+      <a class="custom-back-btn" href="index.html">Back</a>
+    </div>
+
+  </div>
+
+  <script src="custom.js"></script>
+</body>
+</html>

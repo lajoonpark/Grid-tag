@@ -1,0 +1,698 @@
+/* ==========================================================
+   menu.css – styles for index.html, how-to-play.html,
+               and custom.html.  NOT loaded by game.html.
+   ========================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, Arial, sans-serif;
+  background: radial-gradient(ellipse at 50% 0%, #1c2040 0%, #12131f 70%);
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===========================================================
+   MAIN MENU  (index.html)
+   =========================================================== */
+
+.menu-shell {
+  width: 100%;
+  max-width: 1100px;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(2.5rem, 6vh, 5rem);
+  /* prevent page from scrolling on standard screens */
+  max-height: 100vh;
+  justify-content: center;
+}
+
+/* --- Hero --- */
+.menu-hero {
+  text-align: center;
+  user-select: none;
+}
+
+.hero-title {
+  font-size: clamp(3.8rem, 11vw, 8.5rem);
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  margin: 0 0 0.6rem;
+}
+
+.title-grid {
+  color: #4b5ef8;
+}
+
+.title-tag {
+  color: #9eaaff;
+}
+
+.hero-sub {
+  font-size: clamp(1rem, 2.5vw, 1.45rem);
+  font-weight: 700;
+  color: #5b6ef8;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+/* --- Menu button row --- */
+.menu-buttons {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(2.5rem, 8vw, 7rem);
+  width: 100%;
+}
+
+/* ===========================================================
+   MODE PILL  (expandable card)
+   =========================================================== */
+
+/* Container that holds the pill + absolutely-positioned sub-panels */
+.mode-group {
+  position: relative;
+  /* flex row so sub-panels sit beside the pill via absolute positioning */
+}
+
+/* The pill itself */
+.mode-pill {
+  background: #4a6cf7;
+  border-radius: 22px;
+  padding: 0.95rem 1.5rem;
+  min-width: 210px;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 28px rgba(74, 108, 247, 0.28);
+  /* Animate box-shadow and border-radius as the pill expands */
+  transition: box-shadow 0.28s ease, border-radius 0.28s ease;
+}
+
+.mode-pill:hover,
+.mode-pill:focus-within {
+  box-shadow: 0 10px 40px rgba(74, 108, 247, 0.5);
+  border-radius: 20px;
+  outline: none;
+}
+
+.mode-pill__header {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  padding: 0.2rem 0 0.45rem;
+  letter-spacing: 0.025em;
+}
+
+/* Divider fades in as pill expands */
+.mode-pill__sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.42);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  transition: transform 0.28s ease 0.06s, opacity 0.22s ease 0.06s;
+}
+
+.mode-pill:hover .mode-pill__sep,
+.mode-pill:focus-within .mode-pill__sep {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+/* Options container – max-height slides open */
+.mode-pill__opts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+              padding-top 0.3s ease;
+}
+
+.mode-pill:hover .mode-pill__opts,
+.mode-pill:focus-within .mode-pill__opts {
+  max-height: 260px;
+  padding-top: 0.65rem;
+}
+
+/* Wrapper around each option for individual stagger */
+.mode-opt-row {
+  opacity: 0;
+  transform: translateY(-7px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.mode-pill:hover .mode-opt-row:nth-child(1),
+.mode-pill:focus-within .mode-opt-row:nth-child(1) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.09s;
+}
+
+.mode-pill:hover .mode-opt-row:nth-child(2),
+.mode-pill:focus-within .mode-opt-row:nth-child(2) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.15s;
+}
+
+.mode-pill:hover .mode-opt-row:nth-child(3),
+.mode-pill:focus-within .mode-opt-row:nth-child(3) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.21s;
+}
+
+/* Individual option buttons (CPU, Multiplayer, Custom) */
+.mode-opt {
+  width: 100%;
+  background: rgba(10, 18, 80, 0.52);
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  padding: 0.7rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.18s ease, transform 0.15s ease;
+}
+
+.mode-opt:hover,
+.mode-opt:focus {
+  background: rgba(10, 18, 80, 0.78);
+  outline: none;
+}
+
+/* Purple highlight on active parent (when its sub-panel is open) */
+.mode-group:has(#opt-cpu:hover) #opt-cpu,
+.mode-group:has(#opt-cpu:focus) #opt-cpu,
+.mode-group:has(#sub-cpu:hover) #opt-cpu,
+.mode-group:has(#sub-cpu:focus-within) #opt-cpu {
+  background: #5c3fe0;
+}
+
+.mode-group:has(#opt-multi:hover) #opt-multi,
+.mode-group:has(#opt-multi:focus) #opt-multi,
+.mode-group:has(#sub-multi:hover) #opt-multi,
+.mode-group:has(#sub-multi:focus-within) #opt-multi {
+  background: #5c3fe0;
+}
+
+/* ===========================================================
+   SUB-PANELS  (CPU difficulties / Multiplayer sizes)
+   =========================================================== */
+
+.sub-panel {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 0.9rem);
+
+  background: #4a6cf7;
+  border-radius: 20px;
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.52rem;
+  min-width: 155px;
+  box-shadow: 0 8px 36px rgba(74, 108, 247, 0.38);
+
+  /* Hidden by default */
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-12px);
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+/* CSS :has() – show CPU sub-panel */
+.mode-group:has(#opt-cpu:hover) #sub-cpu,
+.mode-group:has(#opt-cpu:focus) #sub-cpu,
+.mode-group:has(#sub-cpu:hover) #sub-cpu,
+.mode-group:has(#sub-cpu:focus-within) #sub-cpu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+/* CSS :has() – show Multiplayer sub-panel */
+.mode-group:has(#opt-multi:hover) #sub-multi,
+.mode-group:has(#opt-multi:focus) #sub-multi,
+.mode-group:has(#sub-multi:hover) #sub-multi,
+.mode-group:has(#sub-multi:focus-within) #sub-multi {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+/* JS-driven fallback classes (touch / click) */
+.mode-group.show-cpu #sub-cpu,
+.mode-group.show-multi #sub-multi {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.mode-group.show-cpu #opt-cpu,
+.mode-group.show-multi #opt-multi {
+  background: #5c3fe0;
+}
+
+/* Sub-panel buttons */
+.sub-btn {
+  width: 100%;
+  background: rgba(10, 18, 80, 0.52);
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  padding: 0.68rem 1.1rem;
+  font-size: 0.96rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  /* Staggered fade-in shared via opacity + transform */
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: opacity 0.2s ease, transform 0.2s ease,
+              background 0.18s ease;
+}
+
+/* Show sub-btn when its parent panel is active (CSS or JS class) */
+.mode-group:has(#opt-cpu:hover) #sub-cpu .sub-btn,
+.mode-group:has(#opt-cpu:focus) #sub-cpu .sub-btn,
+.mode-group:has(#sub-cpu:hover) #sub-cpu .sub-btn,
+.mode-group:has(#sub-cpu:focus-within) #sub-cpu .sub-btn,
+.mode-group.show-cpu #sub-cpu .sub-btn,
+.mode-group:has(#opt-multi:hover) #sub-multi .sub-btn,
+.mode-group:has(#opt-multi:focus) #sub-multi .sub-btn,
+.mode-group:has(#sub-multi:hover) #sub-multi .sub-btn,
+.mode-group:has(#sub-multi:focus-within) #sub-multi .sub-btn,
+.mode-group.show-multi #sub-multi .sub-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger delays */
+.sub-btn:nth-child(1) { transition-delay: 0.05s; }
+.sub-btn:nth-child(2) { transition-delay: 0.10s; }
+.sub-btn:nth-child(3) { transition-delay: 0.15s; }
+.sub-btn:nth-child(4) { transition-delay: 0.20s; }
+
+.sub-btn:hover,
+.sub-btn:focus {
+  background: rgba(10, 18, 80, 0.82);
+  transform: scale(1.04) !important;
+  outline: none;
+}
+
+/* ===========================================================
+   HOW TO PLAY pill
+   =========================================================== */
+
+.htp-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #4a6cf7;
+  border-radius: 999px;
+  padding: 1rem 2.4rem;
+  font-size: clamp(1rem, 2.2vw, 1.3rem);
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 28px rgba(74, 108, 247, 0.28);
+  align-self: center;
+  flex-shrink: 0;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.htp-pill:hover,
+.htp-pill:focus {
+  background: #3b5ce0;
+  box-shadow: 0 10px 40px rgba(74, 108, 247, 0.5);
+  transform: scale(1.04) translateY(-1px);
+  outline: none;
+}
+
+/* ===========================================================
+   SHARED PAGE CHROME  (How to Play + Custom pages)
+   =========================================================== */
+
+.page-shell {
+  width: 100%;
+  max-width: 860px;
+  padding: clamp(1.2rem, 3vw, 2.5rem);
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.6rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.page-logo {
+  font-size: 1.6rem;
+  font-weight: 900;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+
+.page-logo .logo-grid { color: #4b5ef8; }
+.page-logo .logo-tag  { color: #9eaaff; }
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 2px solid rgba(74, 108, 247, 0.5);
+  border-radius: 999px;
+  background: transparent;
+  color: #9eaaff;
+  padding: 0.48rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.back-btn:hover,
+.back-btn:focus {
+  background: rgba(74, 108, 247, 0.15);
+  border-color: #4a6cf7;
+  color: #fff;
+  outline: none;
+}
+
+.page-title {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 900;
+  color: #e2e8f0;
+  margin: 0 0 0.3rem;
+}
+
+.page-subtitle {
+  color: #94a3b8;
+  margin: 0 0 1.6rem;
+  font-size: 0.95rem;
+}
+
+/* ===========================================================
+   HOW TO PLAY PAGE
+   =========================================================== */
+
+.htp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+}
+
+.info-card {
+  background: #1a1e38;
+  border: 1px solid #2d3a5e;
+  border-radius: 16px;
+  padding: 1.1rem 1.3rem;
+}
+
+.info-card h3 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #9eaaff;
+  margin: 0 0 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.info-card ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.info-card li {
+  color: #94a3b8;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.info-card strong {
+  color: #c7d2fe;
+}
+
+/* ===========================================================
+   CUSTOM SETUP PAGE
+   =========================================================== */
+
+.custom-card {
+  background: #1a1e38;
+  border: 1px solid #2d3a5e;
+  border-radius: 20px;
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  margin-bottom: 1.2rem;
+}
+
+.custom-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+
+.custom-field label {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.custom-field input,
+.custom-field select {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  color: #e2e8f0;
+  padding: 0.58rem 0.75rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.custom-field input:focus,
+.custom-field select:focus {
+  border-color: #4a6cf7;
+  outline: none;
+}
+
+.custom-validation {
+  color: #fca5a5;
+  font-size: 0.88rem;
+  margin: 0;
+  min-height: 1.2em;
+  grid-column: 1 / -1;
+}
+
+.custom-summary {
+  color: #93c5fd;
+  font-size: 0.84rem;
+  margin: 0;
+  grid-column: 1 / -1;
+}
+
+.custom-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.custom-play-btn {
+  flex: 1;
+  min-width: 110px;
+  background: #4a6cf7;
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  padding: 0.9rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 22px rgba(74, 108, 247, 0.3);
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+
+.custom-play-btn:hover:not(:disabled) {
+  background: #3b5ce0;
+  box-shadow: 0 8px 36px rgba(74, 108, 247, 0.5);
+  transform: scale(1.03) translateY(-1px);
+}
+
+.custom-play-btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.custom-back-btn {
+  background: transparent;
+  border: 2px solid rgba(74, 108, 247, 0.5);
+  border-radius: 999px;
+  color: #9eaaff;
+  padding: 0.9rem 1.8rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.custom-back-btn:hover,
+.custom-back-btn:focus {
+  background: rgba(74, 108, 247, 0.15);
+  border-color: #4a6cf7;
+  color: #fff;
+  outline: none;
+}
+
+/* ===========================================================
+   RESPONSIVE
+   =========================================================== */
+
+@media (max-width: 760px) {
+  /* On small screens, show all mode options without hover required */
+  .menu-buttons {
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .mode-pill__opts {
+    max-height: 300px !important;
+    padding-top: 0.65rem !important;
+  }
+
+  .mode-pill__sep {
+    transform: scaleX(1) !important;
+    opacity: 1 !important;
+  }
+
+  .mode-opt-row {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+  }
+
+  /* Sub-panels stack below on mobile (no absolute positioning) */
+  .mode-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sub-panel {
+    position: static;
+    transform: none !important;
+    opacity: 0;
+    pointer-events: none;
+    max-height: 0;
+    overflow: hidden;
+    padding: 0 1.1rem;
+    transition: max-height 0.35s ease, padding 0.3s ease, opacity 0.25s ease;
+    margin-top: 0;
+    box-shadow: none;
+    border-radius: 0 0 18px 18px;
+  }
+
+  .mode-group.show-cpu #sub-cpu,
+  .mode-group.show-multi #sub-multi {
+    opacity: 1;
+    pointer-events: auto;
+    max-height: 260px;
+    padding: 0.75rem 1.1rem;
+  }
+
+  /* Override desktop :has() for mobile (sub-panels stay static) */
+  .mode-group:has(#opt-cpu:hover) #sub-cpu,
+  .mode-group:has(#opt-cpu:focus) #sub-cpu,
+  .mode-group:has(#sub-cpu:hover) #sub-cpu,
+  .mode-group:has(#sub-cpu:focus-within) #sub-cpu,
+  .mode-group:has(#opt-multi:hover) #sub-multi,
+  .mode-group:has(#opt-multi:focus) #sub-multi,
+  .mode-group:has(#sub-multi:hover) #sub-multi,
+  .mode-group:has(#sub-multi:focus-within) #sub-multi {
+    /* Reset – JS show-* classes take over on mobile */
+    opacity: 0;
+    pointer-events: none;
+    transform: none;
+  }
+
+  .mode-group.show-cpu #sub-cpu,
+  .mode-group.show-multi #sub-multi {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    max-height: 260px;
+    padding: 0.75rem 1.1rem;
+  }
+
+  .htp-pill {
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+  }
+
+  /* How to Play: single column */
+  .htp-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .page-shell {
+    justify-content: flex-start;
+    padding-top: 1.5rem;
+    min-height: unset;
+  }
+}
+
+@media (max-width: 520px) {
+  .custom-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1000px) {
+  .htp-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
