@@ -1,7 +1,8 @@
 const CONFIG = {
   GRID_SIZE: 30,
   ROUND_MS: 60000,
-  COUNTDOWN_SECONDS: 3
+  COUNTDOWN_SECONDS: 3,
+  MIN_SPAWN_BUFFER: 4
 };
 
 const PHASE = {
@@ -398,7 +399,7 @@ function spawnEntities(entities) {
   ]);
   const occupied = new Set();
   // Try to keep early opposing spawns separated to reduce instant tags at round start.
-  const minOpposingDistance = Math.max(4, Math.floor(CONFIG.GRID_SIZE / 5));
+  const minOpposingDistance = Math.max(CONFIG.MIN_SPAWN_BUFFER, Math.floor(CONFIG.GRID_SIZE / 5));
 
   for (const entity of entities) {
     sideCounts.set(entity.side, (sideCounts.get(entity.side) ?? 0) + 1);
