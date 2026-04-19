@@ -98,8 +98,7 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 28px rgba(74, 108, 247, 0.28);
-  transition: box-shadow 0.28s ease;
-  /* Rounded pill ↔ card: transition border-radius */
+  /* Animate box-shadow and border-radius as the pill expands */
   transition: box-shadow 0.28s ease, border-radius 0.28s ease;
 }
 

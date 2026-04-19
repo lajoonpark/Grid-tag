@@ -32,11 +32,9 @@ function launchGame(mode, difficulty) {
 
   if (!modeGroup || !optCpu || !optMulti) return;
 
-  /* Detect pointer type. coarse == touch/mobile */
-  const isTouchPrimary = window.matchMedia('(pointer: coarse)').matches;
-
-  /* On desktop (fine pointer) the CSS :has() rules do all the visual
-     work.  We only need to add JS classes for the click-toggle path. */
+  /* CSS :has() rules handle desktop hover visuals automatically.
+     JS classes (show-cpu / show-multi) provide the click-toggle path
+     for keyboard and touch users. */
 
   function clearSubs() {
     modeGroup.classList.remove('show-cpu', 'show-multi');

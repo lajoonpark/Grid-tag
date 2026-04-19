@@ -19,11 +19,11 @@ const GRID_TOTAL_CELLS   = 30 * 30; /* 900 */
    ------------------------------------------------------------------ */
 function readForm() {
   return {
-    runners:       parseInt(document.getElementById('c-runners').value,      10),
-    chasers:       parseInt(document.getElementById('c-chasers').value,      10),
-    humanRole:     document.getElementById('c-human-role').value,
-    humanCount:    parseInt(document.getElementById('c-human-count').value,  10),
-    cpuCount:      parseInt(document.getElementById('c-cpu-count').value,    10),
+    runners: parseInt(document.getElementById('c-runners').value, 10),
+    chasers: parseInt(document.getElementById('c-chasers').value, 10),
+    humanRole: document.getElementById('c-human-role').value,
+    humanCount: parseInt(document.getElementById('c-human-count').value, 10),
+    cpuCount: parseInt(document.getElementById('c-cpu-count').value, 10),
     cpuDifficulty: document.getElementById('c-difficulty').value
   };
 }
