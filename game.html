@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grid Tag</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hud" aria-label="Game HUD">
+      <div class="hud-stats">
+        <div class="hud-item">
+          <span class="label">Mode</span>
+          <strong id="mode-value">SINGLE PLAYER</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Role</span>
+          <strong id="role-value">Blue: RUNNER | Red: CHASER</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Difficulty</span>
+          <strong id="difficulty-value">NORMAL</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Timer</span>
+          <strong id="timer-value">60s</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Score (Runner-Chaser)</span>
+          <strong id="score-value">0-0</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Active (Runners-Chasers)</span>
+          <strong id="active-counts-value">1-1</strong>
+        </div>
+        <div class="hud-item">
+          <span class="label">Countdown</span>
+          <strong id="countdown-value" class="countdown-pill">-</strong>
+        </div>
+      </div>
+      <div class="hud-controls">
+        <button id="start-btn" type="button">Start</button>
+        <button id="pause-btn" type="button">Pause</button>
+        <button id="restart-round-btn" type="button">Restart Round</button>
+        <button id="role-runner-btn" type="button">Play as Runner</button>
+        <button id="role-chaser-btn" type="button">Play as Chaser</button>
+        <label class="difficulty-picker" for="mode-select">
+          <span class="label">Mode</span>
+          <select id="mode-select">
+            <option value="single-player">Single Player</option>
+            <option value="1v1">Local 1v1</option>
+            <option value="2v2">Local 2v2</option>
+            <option value="3v3">Local 3v3</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label class="difficulty-picker" for="difficulty-select">
+          <span class="label">CPU Difficulty</span>
+          <select id="difficulty-select">
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="insane">Insane</option>
+            <option value="demon">Demon</option>
+          </select>
+        </label>
+        <button id="menu-btn" type="button" class="btn-menu-back" onclick="location.href='index.html'">&#8592; Menu</button>
+      </div>
+
+      <section id="custom-setup-panel" class="custom-setup-panel" aria-label="Custom mode setup" hidden>
+        <label class="difficulty-picker" for="custom-runners-input">
+          <span class="label">Runners</span>
+          <input id="custom-runners-input" type="number" min="1" value="2" />
+        </label>
+        <label class="difficulty-picker" for="custom-chasers-input">
+          <span class="label">Chasers</span>
+          <input id="custom-chasers-input" type="number" min="1" value="2" />
+        </label>
+        <label class="difficulty-picker" for="custom-human-role-select">
+          <span class="label">Human Role</span>
+          <select id="custom-human-role-select">
+            <option value="runner">Runner</option>
+            <option value="chaser">Chaser</option>
+          </select>
+        </label>
+        <label class="difficulty-picker" for="custom-human-count-input">
+          <span class="label">Human-Controlled</span>
+          <input id="custom-human-count-input" type="number" min="1" value="1" />
+        </label>
+        <label class="difficulty-picker" for="custom-cpu-count-input">
+          <span class="label">CPU-Controlled</span>
+          <input id="custom-cpu-count-input" type="number" min="0" value="3" />
+        </label>
+        <label class="difficulty-picker" for="custom-difficulty-select">
+          <span class="label">CPU Difficulty</span>
+          <select id="custom-difficulty-select">
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="insane">Insane</option>
+            <option value="demon">Demon</option>
+          </select>
+        </label>
+        <p id="custom-validation-message" class="custom-validation-message" role="status"></p>
+        <p id="custom-summary-value" class="custom-summary-value"></p>
+      </section>
+    </header>
+
+    <p id="mobile-warning" class="mobile-warning" role="status" hidden>
+      Mobile is not recommended: this game is tuned for keyboard controls and larger screens.
+    </p>
+
+    <section class="status-panel" aria-label="Round status">
+      <h2 id="result-value">Press Start</h2>
+    </section>
+
+    <section class="game-area" aria-label="Grid chase game area">
+      <div id="grid" class="grid" role="grid" aria-label="30 by 30 game grid"></div>
+      <div id="round-overlay" class="round-overlay" hidden>
+        <div class="overlay-card">
+          <h3 id="overlay-title">Round Over</h3>
+          <p id="overlay-message"></p>
+          <div class="overlay-actions">
+            <button id="overlay-restart-btn" type="button">Play Again</button>
+            <button id="overlay-close-btn" type="button">Close</button>
+            <button id="overlay-menu-btn" type="button" class="btn-menu-back" onclick="location.href='index.html'">&#8592; Menu</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="instructions-panel" aria-label="Instructions">
+      <h3>How to Play</h3>
+      <p id="instructions-value" class="instructions">
+        Single Player: Blue (you) moves with WASD or Arrow Keys. Red CPU moves automatically.
+      </p>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+</body>
+</html>

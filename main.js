@@ -1234,7 +1234,7 @@ function setRole(role) {
     return;
   }
   state.role = role;
-  setRoundResult('Press Start Game');
+  setRoundResult('Press Start');
   renderHUD();
   renderEntities();
 }
@@ -1247,7 +1247,7 @@ function setDifficulty(difficulty) {
     return;
   }
   state.difficulty = difficulty;
-  setRoundResult('Press Start Game');
+  setRoundResult('Press Start');
   renderHUD();
 }
 
@@ -1273,7 +1273,7 @@ function setMode(mode) {
     if (validation.isValid) {
       state.entities = createEntitiesForCurrentMode();
       spawnEntities(state.entities);
-      setRoundResult(`${getCustomSetupSummary(state.customSetup)}. Press Start Game`);
+      setRoundResult(`${getCustomSetupSummary(state.customSetup)}. Press Start`);
     } else {
       state.entities = [];
       setRoundResult(`Custom setup invalid: ${validation.message}`);
@@ -1281,7 +1281,7 @@ function setMode(mode) {
   } else {
     state.entities = createEntitiesForCurrentMode();
     spawnEntities(state.entities);
-    setRoundResult('Press Start Game');
+    setRoundResult('Press Start');
   }
 
   render();
@@ -1300,7 +1300,7 @@ function setCustomSetup(nextSetup) {
     if (validation.isValid) {
       state.entities = createEntitiesForCurrentMode();
       spawnEntities(state.entities);
-      setRoundResult(`${getCustomSetupSummary(nextSetup)}. Press Start Game`);
+      setRoundResult(`${getCustomSetupSummary(nextSetup)}. Press Start`);
     } else {
       state.entities = [];
       setRoundResult(`Custom setup invalid: ${validation.message}`);
@@ -1322,9 +1322,56 @@ function closeOverlay() {
   renderOverlay();
 }
 
+/* ------------------------------------------------------------------
+   Read the launch config written to sessionStorage by menu.js or
+   custom.js, consume it, and return it (or null if none present).
+   Also accepts a ?mode=&difficulty= query-string fallback.
+   ------------------------------------------------------------------ */
+function readLaunchConfig() {
+  try {
+    const raw = sessionStorage.getItem('gridtag-config');
+    if (raw) {
+      sessionStorage.removeItem('gridtag-config');
+      return JSON.parse(raw);
+    }
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('mode');
+    if (mode) {
+      return { mode: mode, difficulty: params.get('difficulty') || DIFFICULTY.NORMAL };
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+
 function init() {
+  // Apply launch config from the main menu (before entities are built)
+  const launchConfig = readLaunchConfig();
+  const hasLaunchConfig = launchConfig !== null;
+
+  if (launchConfig) {
+    const validModes = [
+      MODE.SINGLE_PLAYER, MODE.ONE_VS_ONE, MODE.TWO_VS_TWO,
+      MODE.THREE_VS_THREE, MODE.CUSTOM
+    ];
+    if (validModes.includes(launchConfig.mode)) {
+      state.mode = launchConfig.mode;
+    }
+    if (launchConfig.difficulty && DIFFICULTY_CONFIG[launchConfig.difficulty]) {
+      state.difficulty = launchConfig.difficulty;
+    }
+    if (launchConfig.customSetup) {
+      state.customSetup = Object.assign({}, state.customSetup, launchConfig.customSetup);
+      if (launchConfig.customSetup.humanRole) {
+        state.role = launchConfig.customSetup.humanRole;
+      }
+    }
+  }
+
   buildGrid();
 
+  // Sync selects and custom inputs to the (possibly updated) state
+  view.modeSelect.value = state.mode;
+  view.difficultySelect.value = state.difficulty;
   view.customRunnersInput.value = String(state.customSetup.runners);
   view.customChasersInput.value = String(state.customSetup.chasers);
   view.customHumanRoleSelect.value = state.customSetup.humanRole;
@@ -1357,6 +1404,11 @@ function init() {
   window.addEventListener('resize', renderMobileWarning);
 
   requestAnimationFrame(gameLoop);
+
+  // Auto-start when launched from the main menu with a chosen config
+  if (hasLaunchConfig) {
+    startRound();
+  }
 }
 
 init();
