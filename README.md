@@ -37,6 +37,7 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
   - `Local 1v1`: blue human vs red human on one keyboard
   - `Local 2v2`: two blue humans vs two red humans on one keyboard
   - `Local 3v3`: three blue humans vs three red humans on one keyboard
+  - `Custom`: configurable runners/chasers with mixed human/CPU counts
 - Local 1v1 controls:
   - Blue player: `WASD`
   - Red player: `Arrow Keys`
@@ -50,6 +51,15 @@ First playable browser-based grid tag game built with plain HTML, CSS, and JavaS
 - Team round outcomes (1v1/2v2/3v3):
   - runner team wins if at least one runner survives until timer ends
   - chaser team wins if all runners are tagged before timer ends
+- Custom mode setup supports:
+  - number of runners
+  - number of chasers
+  - human role (`runner` or `chaser`)
+  - number of human-controlled entities
+  - number of CPU-controlled entities
+  - CPU difficulty (`Normal`, `Hard`, `Insane`, `Demon`)
+- Custom mode validation prevents invalid setups (for example mismatched totals or too many humans for the selected human role).
+- Custom mode summary is shown before round start.
 - Round result text:
   - `You survived`
   - `You were caught`

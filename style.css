@@ -89,6 +89,36 @@ select {
   padding: 0.35rem 0.5rem;
 }
 
+input[type='number'] {
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #0f172a;
+  color: var(--text);
+  padding: 0.35rem 0.5rem;
+  width: 100px;
+}
+
+.custom-setup-panel {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.custom-validation-message {
+  margin: 0;
+  color: #fca5a5;
+  grid-column: 1 / -1;
+}
+
+.custom-summary-value {
+  margin: 0;
+  color: #93c5fd;
+  grid-column: 1 / -1;
+}
+
 .status-panel {
   background: var(--panel);
   border: 1px solid #334155;
