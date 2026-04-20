@@ -50,16 +50,23 @@
           <span class="label">Chasers</span>
           <input id="custom-chasers-input" type="number" min="1" value="2" />
         </label>
-        <label class="difficulty-picker" for="custom-human-role-select">
-          <span class="label">Human Role</span>
-          <select id="custom-human-role-select">
+        <label class="difficulty-picker" for="custom-human-one-role-select">
+          <span class="label">Human 1 Role</span>
+          <select id="custom-human-one-role-select">
             <option value="runner">Runner</option>
             <option value="chaser">Chaser</option>
           </select>
         </label>
+        <label class="difficulty-picker" for="custom-human-two-role-select">
+          <span class="label">Human 2 Role</span>
+          <select id="custom-human-two-role-select">
+            <option value="chaser">Chaser</option>
+            <option value="runner">Runner</option>
+          </select>
+        </label>
         <label class="difficulty-picker" for="custom-human-count-input">
           <span class="label">Human-Controlled</span>
-          <input id="custom-human-count-input" type="number" min="1" value="1" />
+          <input id="custom-human-count-input" type="number" min="1" max="2" value="1" />
         </label>
         <label class="difficulty-picker" for="custom-cpu-count-input">
           <span class="label">CPU-Controlled</span>

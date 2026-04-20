@@ -20,13 +20,10 @@ Browser-based grid tag game built with plain HTML, CSS, and JavaScript (no frame
   - Blue side and Red side are both human-controlled on one keyboard.
 - **Local 2v2**
   - Two blue entities vs two red entities.
-  - Shared team controls per side.
-- **Local 3v3**
-  - Three blue entities vs three red entities.
-  - Shared team controls per side.
+  - Each human has independent movement controls.
 - **Custom**
   - Configure runner/chaser counts.
-  - Configure human role, human count, CPU count, and CPU difficulty.
+  - Configure up to 2 human players with independent roles, plus CPU count and CPU difficulty.
   - Validation prevents invalid setups.
 
 ## Controls
@@ -44,11 +41,14 @@ Browser-based grid tag game built with plain HTML, CSS, and JavaScript (no frame
 - **Local 1v1**
   - Blue side: `WASD`
   - Red side: `Arrow Keys`
-- **Local 2v2 / 3v3**
-  - Blue team: `WASD` (all blue teammates move together)
-  - Red team: `Arrow Keys` (all red teammates move together)
+- **Local 2v2**
+  - Blue Player 1: `WASD`
+  - Blue Player 2: `TFGH`
+  - Red Player 1: `Arrow Keys`
+  - Red Player 2: `IJKL`
 - **Custom**
-  - Human-controlled entities move together with `WASD` or `Arrow Keys`
+  - Human 1: `WASD`
+  - Human 2: `Arrow Keys`
 
 ## Rules
 
@@ -76,7 +76,6 @@ Browser-based grid tag game built with plain HTML, CSS, and JavaScript (no frame
 
 - No online multiplayer.
 - Single keyboard local play means key rollover/ghosting can vary by hardware.
-- Shared controls in team modes move all same-side teammates together (not per-entity controls).
 - No sound effects yet.
 - No obstacle tiles or map variations yet.
 

@@ -41,7 +41,6 @@ const MODE = {
   SINGLE_PLAYER: 'single-player',
   ONE_VS_ONE: '1v1',
   TWO_VS_TWO: '2v2',
-  THREE_VS_THREE: '3v3',
   CUSTOM: 'custom'
 };
 
@@ -66,6 +65,18 @@ const CONTROL_MAPPINGS = {
     ArrowDown: { x: 0, y: 1 },
     ArrowLeft: { x: -1, y: 0 },
     ArrowRight: { x: 1, y: 0 }
+  },
+  TFGH: {
+    t: { x: 0, y: -1 },
+    g: { x: 0, y: 1 },
+    f: { x: -1, y: 0 },
+    h: { x: 1, y: 0 }
+  },
+  IJKL: {
+    i: { x: 0, y: -1 },
+    k: { x: 0, y: 1 },
+    j: { x: -1, y: 0 },
+    l: { x: 1, y: 0 }
   }
 };
 
@@ -190,7 +201,8 @@ const view = {
   customSetupPanel: document.getElementById('custom-setup-panel'),
   customRunnersInput: document.getElementById('custom-runners-input'),
   customChasersInput: document.getElementById('custom-chasers-input'),
-  customHumanRoleSelect: document.getElementById('custom-human-role-select'),
+  customHumanOneRoleSelect: document.getElementById('custom-human-one-role-select'),
+  customHumanTwoRoleSelect: document.getElementById('custom-human-two-role-select'),
   customHumanCountInput: document.getElementById('custom-human-count-input'),
   customCpuCountInput: document.getElementById('custom-cpu-count-input'),
   customDifficultySelect: document.getElementById('custom-difficulty-select'),
@@ -472,20 +484,67 @@ function getDefaultCustomSetup() {
   return {
     runners: 2,
     chasers: 2,
-    humanRole: ROLE.RUNNER,
+    humanOneRole: ROLE.RUNNER,
+    humanTwoRole: ROLE.CHASER,
     humanCount: 1,
     cpuCount: 3,
     cpuDifficulty: DIFFICULTY.NORMAL
   };
 }
 
-function getCustomRoleCount(setup, role) {
-  return role === ROLE.RUNNER ? setup.runners : setup.chasers;
+function isRoleValid(role) {
+  return role === ROLE.RUNNER || role === ROLE.CHASER;
+}
+
+function getActiveCustomHumanRoles(setup) {
+  const roles = [setup.humanOneRole];
+  if (setup.humanCount >= 2) {
+    roles.push(setup.humanTwoRole);
+  }
+  return roles;
+}
+
+function getCustomHumanRoleCounts(setup) {
+  const roles = getActiveCustomHumanRoles(setup);
+  return roles.reduce(
+    (counts, role) => {
+      if (role === ROLE.RUNNER) {
+        counts.runners += 1;
+      } else if (role === ROLE.CHASER) {
+        counts.chasers += 1;
+      }
+      return counts;
+    },
+    { runners: 0, chasers: 0 }
+  );
+}
+
+function normalizeCustomSetup(inputSetup) {
+  const fallback = getDefaultCustomSetup();
+  const next = Object.assign({}, fallback, inputSetup || {});
+
+  if (!isRoleValid(next.humanOneRole) && isRoleValid(next.humanRole)) {
+    next.humanOneRole = next.humanRole;
+  }
+  if (!isRoleValid(next.humanOneRole)) {
+    next.humanOneRole = fallback.humanOneRole;
+  }
+  if (!isRoleValid(next.humanTwoRole)) {
+    next.humanTwoRole = getOppositeRole(next.humanOneRole);
+  }
+
+  if (!Number.isInteger(next.humanCount)) {
+    next.humanCount = parseIntegerInput(next.humanCount, fallback.humanCount, 1);
+  }
+  next.humanCount = Math.max(1, Math.min(2, next.humanCount));
+
+  return next;
 }
 
 function getCustomSetupValidation(setup) {
   const total = setup.runners + setup.chasers;
-  const selectedRoleCount = getCustomRoleCount(setup, setup.humanRole);
+  const activeHumanRoles = getActiveCustomHumanRoles(setup);
+  const humanRoleCounts = getCustomHumanRoleCounts(setup);
 
   if (!Number.isInteger(setup.runners) || setup.runners < 1) {
     return { isValid: false, message: 'Runners must be at least 1.' };
@@ -493,11 +552,14 @@ function getCustomSetupValidation(setup) {
   if (!Number.isInteger(setup.chasers) || setup.chasers < 1) {
     return { isValid: false, message: 'Chasers must be at least 1.' };
   }
-  if (!Number.isInteger(setup.humanCount) || setup.humanCount < 1) {
-    return { isValid: false, message: 'Human-controlled count must be at least 1.' };
+  if (!Number.isInteger(setup.humanCount) || setup.humanCount < 1 || setup.humanCount > 2) {
+    return { isValid: false, message: 'Human-controlled count must be 1 or 2.' };
   }
   if (!Number.isInteger(setup.cpuCount) || setup.cpuCount < 0) {
     return { isValid: false, message: 'CPU-controlled count cannot be negative.' };
+  }
+  if (!activeHumanRoles.every((role) => isRoleValid(role))) {
+    return { isValid: false, message: 'Select valid role(s) for all human players.' };
   }
   if (!DIFFICULTY_CONFIG[setup.cpuDifficulty]) {
     return { isValid: false, message: 'Select a valid CPU difficulty.' };
@@ -505,11 +567,16 @@ function getCustomSetupValidation(setup) {
   if (total > CONFIG.GRID_SIZE * CONFIG.GRID_SIZE) {
     return { isValid: false, message: 'Total runners + chasers exceeds available grid cells.' };
   }
-  if (setup.humanCount > selectedRoleCount) {
-    const roleLabel = setup.humanRole === ROLE.RUNNER ? 'runner' : 'chaser';
+  if (humanRoleCounts.runners > setup.runners) {
     return {
       isValid: false,
-      message: `Human-controlled count cannot exceed total ${roleLabel}s (${selectedRoleCount}).`
+      message: `Human runner selections cannot exceed total runners (${setup.runners}).`
+    };
+  }
+  if (humanRoleCounts.chasers > setup.chasers) {
+    return {
+      isValid: false,
+      message: `Human chaser selections cannot exceed total chasers (${setup.chasers}).`
     };
   }
   if (setup.humanCount + setup.cpuCount !== total) {
@@ -523,25 +590,28 @@ function getCustomSetupValidation(setup) {
 }
 
 function getCustomSetupSummary(setup) {
-  const cpuRunners = setup.runners - (setup.humanRole === ROLE.RUNNER ? setup.humanCount : 0);
-  const cpuChasers = setup.chasers - (setup.humanRole === ROLE.CHASER ? setup.humanCount : 0);
-  const roleLabel = setup.humanRole === ROLE.RUNNER ? 'runner' : 'chaser';
+  const humanRoles = getActiveCustomHumanRoles(setup);
+  const humanRoleCounts = getCustomHumanRoleCounts(setup);
+  const cpuRunners = setup.runners - humanRoleCounts.runners;
+  const cpuChasers = setup.chasers - humanRoleCounts.chasers;
+  const humanRolesLabel = humanRoles.map((role, index) => `H${index + 1}:${getRoleLabel(role)}`).join(', ');
   const difficultyLabel =
     DIFFICULTY_CONFIG[setup.cpuDifficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
-  return `Custom: ${setup.runners}R vs ${setup.chasers}C | Humans: ${setup.humanCount} ${roleLabel}(s) | CPUs: ${setup.cpuCount} (${cpuRunners}R/${cpuChasers}C) | CPU difficulty: ${difficultyLabel}`;
+  return `Custom: ${setup.runners}R vs ${setup.chasers}C | Humans: ${setup.humanCount} (${humanRolesLabel}) | CPUs: ${setup.cpuCount} (${cpuRunners}R/${cpuChasers}C) | CPU difficulty: ${difficultyLabel}`;
 }
 
 function readCustomSetupFromInputs() {
-  return {
+  return normalizeCustomSetup({
     runners: parseIntegerInput(view.customRunnersInput.value, 1, 1),
     chasers: parseIntegerInput(view.customChasersInput.value, 1, 1),
-    humanRole: view.customHumanRoleSelect.value === ROLE.CHASER ? ROLE.CHASER : ROLE.RUNNER,
+    humanOneRole: view.customHumanOneRoleSelect.value === ROLE.CHASER ? ROLE.CHASER : ROLE.RUNNER,
+    humanTwoRole: view.customHumanTwoRoleSelect.value === ROLE.CHASER ? ROLE.CHASER : ROLE.RUNNER,
     humanCount: parseIntegerInput(view.customHumanCountInput.value, 1, 1),
     cpuCount: parseIntegerInput(view.customCpuCountInput.value, 0, 0),
     cpuDifficulty: DIFFICULTY_CONFIG[view.customDifficultySelect.value]
       ? view.customDifficultySelect.value
       : DIFFICULTY.NORMAL
-  };
+  });
 }
 
 function createEntitiesForCurrentMode() {
@@ -555,10 +625,6 @@ function createEntitiesForCurrentMode() {
 
   if (state.mode === MODE.TWO_VS_TWO) {
     return createEntitiesForLocalTeamMode(2);
-  }
-
-  if (state.mode === MODE.THREE_VS_THREE) {
-    return createEntitiesForLocalTeamMode(3);
   }
 
   if (state.mode === MODE.CUSTOM) {
@@ -615,6 +681,8 @@ function createEntitiesForLocalTeamMode(teamSize) {
   const redRole = getOppositeRole(state.role);
   const blueColors = LOCAL_TEAM_COLORS[SIDE.BLUE];
   const redColors = LOCAL_TEAM_COLORS[SIDE.RED];
+  const blueControlMappings = [CONTROL_MAPPINGS.WASD, CONTROL_MAPPINGS.TFGH];
+  const redControlMappings = [CONTROL_MAPPINGS.ARROWS, CONTROL_MAPPINGS.IJKL];
   const entities = [];
 
   for (let i = 0; i < teamSize; i += 1) {
@@ -624,7 +692,8 @@ function createEntitiesForLocalTeamMode(teamSize) {
         side: SIDE.BLUE,
         role: state.role,
         color: blueColors[i] ?? blueColors[blueColors.length - 1],
-        controlMapping: CONTROL_MAPPINGS.WASD
+        controlMapping:
+          blueControlMappings[i] ?? blueControlMappings[blueControlMappings.length - 1]
       })
     );
   }
@@ -636,7 +705,7 @@ function createEntitiesForLocalTeamMode(teamSize) {
         side: SIDE.RED,
         role: redRole,
         color: redColors[i] ?? redColors[redColors.length - 1],
-        controlMapping: CONTROL_MAPPINGS.ARROWS
+        controlMapping: redControlMappings[i] ?? redControlMappings[redControlMappings.length - 1]
       })
     );
   }
@@ -651,26 +720,43 @@ function createEntitiesForCustomMode() {
   }
 
   const setup = state.customSetup;
-  const blueRole = setup.humanRole;
-  const redRole = getOppositeRole(blueRole);
-  const blueCount = getCustomRoleCount(setup, blueRole);
-  const redCount = getCustomRoleCount(setup, redRole);
-  const blueHumanCount = Math.min(setup.humanCount, blueCount);
+  const blueRole = ROLE.RUNNER;
+  const redRole = ROLE.CHASER;
+  const blueCount = setup.runners;
+  const redCount = setup.chasers;
+  const customHumanControls = [CONTROL_MAPPINGS.WASD, CONTROL_MAPPINGS.ARROWS];
+  const humanRoles = getActiveCustomHumanRoles(setup);
+  const humanRoleCounts = getCustomHumanRoleCounts(setup);
+  const blueHumanCount = humanRoleCounts.runners;
+  const redHumanCount = humanRoleCounts.chasers;
   const blueCpuCount = Math.max(0, blueCount - blueHumanCount);
+  const redCpuCount = Math.max(0, redCount - redHumanCount);
   const entities = [];
   const blueColors = TEAM_COLORS[SIDE.BLUE];
   const redColors = TEAM_COLORS[SIDE.RED];
+  let blueHumanIndex = 0;
+  let redHumanIndex = 0;
 
-  for (let i = 0; i < blueHumanCount; i += 1) {
+  for (let i = 0; i < humanRoles.length; i += 1) {
+    const role = humanRoles[i];
+    const side = role === ROLE.RUNNER ? SIDE.BLUE : SIDE.RED;
+    const colorSet = side === SIDE.BLUE ? blueColors : redColors;
+    const sideHumanIndex = side === SIDE.BLUE ? blueHumanIndex : redHumanIndex;
+    const sideHumanId = sideHumanIndex + 1;
     entities.push(
       createHumanEntity({
-        id: `custom-blue-human-${i + 1}`,
-        side: SIDE.BLUE,
-        role: blueRole,
-        color: blueColors[i % blueColors.length],
-        controlMapping: CONTROL_MAPPINGS.ARROW_WASD
+        id: `custom-${side}-human-${sideHumanId}`,
+        side,
+        role,
+        color: colorSet[sideHumanIndex % colorSet.length],
+        controlMapping: customHumanControls[i] ?? customHumanControls[customHumanControls.length - 1]
       })
     );
+    if (side === SIDE.BLUE) {
+      blueHumanIndex += 1;
+    } else {
+      redHumanIndex += 1;
+    }
   }
 
   for (let i = 0; i < blueCpuCount; i += 1) {
@@ -686,13 +772,14 @@ function createEntitiesForCustomMode() {
     );
   }
 
-  for (let i = 0; i < redCount; i += 1) {
+  for (let i = 0; i < redCpuCount; i += 1) {
+    const colorIndex = (i + redHumanCount) % redColors.length;
     entities.push(
       createCpuEntity({
         id: `custom-red-cpu-${i + 1}`,
         side: SIDE.RED,
         role: redRole,
-        color: redColors[i % redColors.length],
+        color: redColors[colorIndex],
         difficulty: setup.cpuDifficulty
       })
     );
@@ -716,9 +803,6 @@ function getModeLabel() {
   if (state.mode === MODE.TWO_VS_TWO) {
     return 'LOCAL 2V2';
   }
-  if (state.mode === MODE.THREE_VS_THREE) {
-    return 'LOCAL 3V3';
-  }
   if (state.mode === MODE.CUSTOM) {
     return 'CUSTOM';
   }
@@ -726,6 +810,9 @@ function getModeLabel() {
 }
 
 function getRolesLabel() {
+  if (state.mode === MODE.CUSTOM) {
+    return `Blue: ${getRoleLabel(ROLE.RUNNER)} | Red: ${getRoleLabel(ROLE.CHASER)}`;
+  }
   return `Blue: ${getRoleLabel(state.role)} | Red: ${getRoleLabel(getOppositeRole(state.role))}`;
 }
 
@@ -746,11 +833,11 @@ function getInstructionsText() {
   if (state.mode === MODE.ONE_VS_ONE) {
     return 'Controls: Blue uses WASD, Red uses Arrow Keys. Rule: chasers win by tagging all runners before time runs out.';
   }
-  if (state.mode === MODE.TWO_VS_TWO || state.mode === MODE.THREE_VS_THREE) {
-    return 'Controls: Blue team uses WASD (shared), Red team uses Arrow Keys (shared). Rule: runners win if at least one survives.';
+  if (state.mode === MODE.TWO_VS_TWO) {
+    return 'Controls: Blue P1 uses WASD, Blue P2 uses TFGH, Red P1 uses Arrow Keys, Red P2 uses IJKL. Rule: runners win if at least one survives.';
   }
   if (state.mode === MODE.CUSTOM) {
-    return 'Controls: all human-controlled entities move together with WASD or Arrow Keys. Use Pause/Restart to manage rounds quickly.';
+    return 'Controls: Human 1 uses WASD, Human 2 uses Arrow Keys. In custom mode, each human can choose runner/chaser independently.';
   }
   return 'Controls: move with WASD or Arrow Keys. Rule: survive as runner or tag as chaser before the 60-second timer ends.';
 }
@@ -771,7 +858,7 @@ function countActiveByRole(entities) {
 }
 
 function isLocalVersusMode(mode) {
-  return mode === MODE.ONE_VS_ONE || mode === MODE.TWO_VS_TWO || mode === MODE.THREE_VS_THREE;
+  return mode === MODE.ONE_VS_ONE || mode === MODE.TWO_VS_TWO;
 }
 
 function isTeamOutcomeMode(mode) {
@@ -901,7 +988,8 @@ function renderHUD() {
     const shouldDisableCustomFields = isRoundActive || !isCustomMode;
     view.customRunnersInput.disabled = shouldDisableCustomFields;
     view.customChasersInput.disabled = shouldDisableCustomFields;
-    view.customHumanRoleSelect.disabled = shouldDisableCustomFields;
+    view.customHumanOneRoleSelect.disabled = shouldDisableCustomFields;
+    view.customHumanTwoRoleSelect.disabled = shouldDisableCustomFields || state.customSetup.humanCount < 2;
     view.customHumanCountInput.disabled = shouldDisableCustomFields;
     view.customCpuCountInput.disabled = shouldDisableCustomFields;
     view.customDifficultySelect.disabled = shouldDisableCustomFields;
@@ -1334,7 +1422,6 @@ function setMode(mode) {
     mode !== MODE.SINGLE_PLAYER &&
     mode !== MODE.ONE_VS_ONE &&
     mode !== MODE.TWO_VS_TWO &&
-    mode !== MODE.THREE_VS_THREE &&
     mode !== MODE.CUSTOM
   ) {
     return;
@@ -1343,7 +1430,7 @@ function setMode(mode) {
   state.overlayDismissed = true;
 
   if (mode === MODE.CUSTOM) {
-    state.role = state.customSetup.humanRole;
+    state.role = ROLE.RUNNER;
     const validation = getCustomSetupValidation(state.customSetup);
     if (validation.isValid) {
       state.entities = createEntitiesForCurrentMode();
@@ -1367,15 +1454,15 @@ function setCustomSetup(nextSetup) {
     return;
   }
 
-  state.customSetup = nextSetup;
-  state.role = nextSetup.humanRole;
-  const validation = getCustomSetupValidation(nextSetup);
+  state.customSetup = normalizeCustomSetup(nextSetup);
+  const validation = getCustomSetupValidation(state.customSetup);
 
   if (state.mode === MODE.CUSTOM) {
+    state.role = ROLE.RUNNER;
     if (validation.isValid) {
       state.entities = createEntitiesForCurrentMode();
       spawnEntities(state.entities);
-      setRoundResult(`${getCustomSetupSummary(nextSetup)}. Press Start`);
+      setRoundResult(`${getCustomSetupSummary(state.customSetup)}. Press Start`);
     } else {
       state.entities = [];
       setRoundResult(`Custom setup invalid: ${validation.message}`);
@@ -1426,7 +1513,7 @@ function init() {
   if (launchConfig) {
     const validModes = [
       MODE.SINGLE_PLAYER, MODE.ONE_VS_ONE, MODE.TWO_VS_TWO,
-      MODE.THREE_VS_THREE, MODE.CUSTOM
+      MODE.CUSTOM
     ];
     if (validModes.includes(launchConfig.mode)) {
       state.mode = launchConfig.mode;
@@ -1435,10 +1522,10 @@ function init() {
       state.difficulty = launchConfig.difficulty;
     }
     if (launchConfig.customSetup) {
-      state.customSetup = Object.assign({}, state.customSetup, launchConfig.customSetup);
-      if (launchConfig.customSetup.humanRole) {
-        state.role = launchConfig.customSetup.humanRole;
-      }
+      state.customSetup = normalizeCustomSetup(
+        Object.assign({}, state.customSetup, launchConfig.customSetup)
+      );
+      state.role = ROLE.RUNNER;
     }
   }
 
@@ -1451,7 +1538,8 @@ function init() {
   if (view.customRunnersInput) {
     view.customRunnersInput.value = String(state.customSetup.runners);
     view.customChasersInput.value = String(state.customSetup.chasers);
-    view.customHumanRoleSelect.value = state.customSetup.humanRole;
+    view.customHumanOneRoleSelect.value = state.customSetup.humanOneRole;
+    view.customHumanTwoRoleSelect.value = state.customSetup.humanTwoRole;
     view.customHumanCountInput.value = String(state.customSetup.humanCount);
     view.customCpuCountInput.value = String(state.customSetup.cpuCount);
     view.customDifficultySelect.value = state.customSetup.cpuDifficulty;
@@ -1514,7 +1602,8 @@ function init() {
   if (view.customRunnersInput) {
     view.customRunnersInput.addEventListener('input', onCustomSetupInputChange);
     view.customChasersInput.addEventListener('input', onCustomSetupInputChange);
-    view.customHumanRoleSelect.addEventListener('change', onCustomSetupInputChange);
+    view.customHumanOneRoleSelect.addEventListener('change', onCustomSetupInputChange);
+    view.customHumanTwoRoleSelect.addEventListener('change', onCustomSetupInputChange);
     view.customHumanCountInput.addEventListener('input', onCustomSetupInputChange);
     view.customCpuCountInput.addEventListener('input', onCustomSetupInputChange);
     view.customDifficultySelect.addEventListener('change', onCustomSetupInputChange);
