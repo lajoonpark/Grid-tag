@@ -594,10 +594,12 @@ function getCustomSetupSummary(setup) {
   const humanRoleCounts = getCustomHumanRoleCounts(setup);
   const cpuRunners = setup.runners - humanRoleCounts.runners;
   const cpuChasers = setup.chasers - humanRoleCounts.chasers;
-  const humanRolesLabel = humanRoles.map((role, index) => `H${index + 1}:${getRoleLabel(role)}`).join(', ');
+  const formattedHumanRoles = humanRoles
+    .map((role, index) => `H${index + 1}:${getRoleLabel(role)}`)
+    .join(', ');
   const difficultyLabel =
     DIFFICULTY_CONFIG[setup.cpuDifficulty]?.label ?? DIFFICULTY_CONFIG[DIFFICULTY.NORMAL].label;
-  return `Custom: ${setup.runners}R vs ${setup.chasers}C | Humans: ${setup.humanCount} (${humanRolesLabel}) | CPUs: ${setup.cpuCount} (${cpuRunners}R/${cpuChasers}C) | CPU difficulty: ${difficultyLabel}`;
+  return `Custom: ${setup.runners}R vs ${setup.chasers}C | Humans: ${setup.humanCount} (${formattedHumanRoles}) | CPUs: ${setup.cpuCount} (${cpuRunners}R/${cpuChasers}C) | CPU difficulty: ${difficultyLabel}`;
 }
 
 function readCustomSetupFromInputs() {
